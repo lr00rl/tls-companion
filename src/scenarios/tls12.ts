@@ -1,0 +1,213 @@
+import type { ScenarioDef } from "./types";
+
+const T = "crypto/tls.";
+
+export const tls12Ecdhe: ScenarioDef = {
+  id: "tls12-ecdhe",
+  tcp: true,
+  intro:
+    "客户端把 `MaxVersion` 设为 TLS 1.2，只提供 `TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256` 一个套件和 X25519 一个组；服务器是默认配置，本可以说 TLS 1.3。TLS 1.2 要先协商好参数才能交换密钥，客户端发出请求之前需要 2 个往返，再加上 TCP 一共 3 个。",
+  steps: [
+    {
+      id: "server-wait",
+      title: "服务器等待 ClientHello",
+      side: 1,
+      at: { mark: "handshake", side: 1 },
+      code: { fn: T + "Conn.serverHandshake", find: "readClientHello" },
+      body: "服务器阻塞在 `readClientHello`。这一侧的配置没有变，它支持 TLS 1.3。",
+    },
+    {
+      id: "ch",
+      title: "TLS 1.2 的 ClientHello",
+      side: 0,
+      at: { enter: T + "Conn.makeClientHello" },
+      code: { fn: T + "Conn.makeClientHello", find: "extendedMasterSecret:         true," },
+      msg: { dir: 0, type: 1 },
+      tab: "fields",
+      body:
+        "没有 `supported_versions` 和 `key_share`：TLS 1.2 的客户端只能先报出能力，等服务器选完再交换密钥，这是它比 TLS 1.3 多一个往返的根源。\n\n留意几个为修补历史漏洞而加的扩展：`extended_master_secret` 防三次握手攻击，`renegotiation_info` 防 2009 年的重协商攻击。Go 默认总会发送它们。",
+      refs: [{ rfc: 5246, sec: "7.4.1.2" }, { note: "T05", h: "clienthello" }, { rfc: 7627 }, { rfc: 5746 }],
+    },
+    {
+      id: "server-pick",
+      title: "服务器选套件，在 random 里埋下降级哨兵",
+      side: 1,
+      at: { enter: T + "serverHandshakeState.processClientHello" },
+      code: { fn: T + "serverHandshakeState.processClientHello", find: "copy(serverRandom[24:], downgradeCanaryTLS12)" },
+      msg: { dir: 1, type: 2 },
+      body:
+        "服务器支持 TLS 1.3，却协商出了 TLS 1.2，于是按 RFC 8446 把 ServerHello.random 的最后 8 字节写成 `DOWNGRD\\x01`。在字段树里看 random 的末尾就是这串字节。\n\n如果有攻击者在中途删掉了客户端的 TLS 1.3 支持，一个同样支持 TLS 1.3 的客户端看到这个哨兵就会中止握手；而 random 被 ServerKeyExchange 的签名覆盖，攻击者改不掉它。这里的客户端自己声明了最高 TLS 1.2，所以哨兵不会触发。",
+      refs: [{ rfc: 8446, sec: "4.1.3" }, { note: "T06", h: "降级保护random-末尾的哨兵" }, { note: "T13", h: "实验-5tls-1.2-和-tls-1.3-对照以及降级哨兵" }],
+    },
+    {
+      id: "ske",
+      title: "Certificate 与 ServerKeyExchange",
+      side: 1,
+      at: { enter: T + "ecdheKeyAgreement.generateServerKeyExchange" },
+      code: { fn: T + "ecdheKeyAgreement.generateServerKeyExchange" },
+      msg: { dir: 1, type: 12 },
+      body:
+        "证书仍然是明文发送，旁观者能看到服务器是谁。ServerKeyExchange 带着服务器临时生成的 X25519 公钥，以及服务器用证书私钥对「client_random、server_random、曲线参数」的签名。\n\n签名只覆盖了这几项，不覆盖整个握手；完整性要等到最后的 Finished 才确认。TLS 1.3 的 CertificateVerify 改成了签整个记录哈希。",
+      refs: [{ rfc: 8422, sec: "5.4" }, { note: "T05", h: "serverkeyexchange" }],
+    },
+    {
+      id: "server-flight",
+      title: "ServerHelloDone：第一个往返结束",
+      side: 1,
+      at: { writeMsg: { dir: 1, type: 2 } },
+      code: { fn: T + "serverHandshakeState.doFullHandshake", find: "helloDone := new(serverHelloDoneMsg)" },
+      msg: { dir: 1, type: 14 },
+      body: "ServerHello、Certificate、ServerKeyExchange、ServerHelloDone 一起发出，全是明文。到这里只交换了参数，双方还没有任何共享秘密。",
+    },
+    {
+      id: "client-verify",
+      title: "客户端验证证书和签名",
+      side: 0,
+      at: { enter: T + "ecdheKeyAgreement.processServerKeyExchange" },
+      code: { fn: T + "ecdheKeyAgreement.processServerKeyExchange", find: "verifyHandshakeSignature" },
+      msg: { dir: 1, type: 12 },
+      body: "客户端先验证证书链，再用叶子证书的公钥验证 ServerKeyExchange 的签名，确认这把 X25519 公钥确实来自证书的持有者。",
+      refs: [{ note: "T03", h: "路径验证客户端到底检查了什么" }],
+    },
+    {
+      id: "cke",
+      title: "ClientKeyExchange 与扩展主密钥",
+      side: 0,
+      at: { enter: T + "ecdheKeyAgreement.generateClientKeyExchange" },
+      code: { fn: T + "clientHandshakeState.doFullHandshake", find: "hs.masterSecret = extMasterFromPreMasterSecret" },
+      msg: { dir: 0, type: 16 },
+      tab: "keys",
+      body:
+        "客户端生成自己的 X25519 密钥，把公钥放进 ClientKeyExchange，与服务器公钥做 ECDH 得到预主密钥。\n\n协商了 extended_master_secret，主密钥就不再用两个 random 计算，而是 `PRF(预主密钥, \"extended master secret\", 会话哈希)`，会话哈希覆盖从 ClientHello 到 ClientKeyExchange 的全部消息，主密钥因此绑定到这一次握手，三次握手攻击无从下手。密钥面板展示了 crypto/tls 实际调用 PRF 的输入和输出。",
+      refs: [{ rfc: 7627, sec: "4" }, { note: "T05", h: "密钥是怎么推导出来的" }, { note: "T04", h: "2014三次握手攻击" }],
+    },
+    {
+      id: "client-keys",
+      title: "key expansion：主密钥展开成会话密钥",
+      side: 0,
+      at: { enter: T + "clientHandshakeState.establishKeys" },
+      code: { fn: T + "keysFromMasterSecret" },
+      tab: "keys",
+      body:
+        "`keysFromMasterSecret` 用 PRF 把主密钥展开成一个密钥块，依次切出客户端写密钥、服务器写密钥和两个 4 字节的隐式 IV（AES-GCM 不需要 MAC 密钥）。TLS 1.2 两个方向的密钥来自同一次展开，TLS 1.3 则为每个方向、每个阶段分别派生。",
+      refs: [{ rfc: 5246, sec: "6.3" }],
+    },
+    {
+      id: "client-finished",
+      title: "ChangeCipherSpec 与客户端 Finished",
+      side: 0,
+      at: { enter: T + "clientHandshakeState.sendFinished" },
+      code: { fn: T + "clientHandshakeState.sendFinished" },
+      msg: { dir: 0, type: 20 },
+      tab: "record",
+      body:
+        "在 TLS 1.2 里 ChangeCipherSpec 是真的：它之后，这个方向的记录开始加密，序号从 0 重新计数。Finished 是第一条加密记录，`verify_data` 是 `PRF(主密钥, \"client finished\", 握手哈希)` 的前 12 字节。\n\n「记录」页里能看到 TLS 1.2 GCM 的特点：每条记录带 8 字节显式 nonce，nonce = 隐式 IV ‖ 显式 nonce，AAD 里含有序号。",
+      refs: [{ rfc: 5246, sec: "7.4.9" }, { rfc: 5288 }],
+    },
+    {
+      id: "server-finish",
+      title: "服务器算出同样的密钥，回 Finished",
+      side: 1,
+      at: { enter: T + "ecdheKeyAgreement.processClientKeyExchange" },
+      code: { fn: T + "serverHandshakeState.doFullHandshake", find: "hs.masterSecret = extMasterFromPreMasterSecret" },
+      msg: { dir: 1, type: 20 },
+      body: "服务器用自己的临时私钥和客户端公钥做 ECDH，得到同一个预主密钥，派生同样的主密钥和密钥块，核对客户端 Finished，然后回自己的 CCS 和 Finished。服务器的握手在这里结束。",
+    },
+    {
+      id: "client-done",
+      title: "第二个往返结束，客户端才能发请求",
+      side: 0,
+      at: { readMsg: { dir: 1, type: 20 } },
+      code: { fn: T + "clientHandshakeState.readFinished", find: "subtle.ConstantTimeCompare(verify" },
+      msg: { dir: 1, type: 20 },
+      body:
+        "客户端核对服务器 Finished 之后，`Handshake()` 才返回。和 TLS 1.3 对比时序图：同样的请求在这里要晚 1 个往返才发出。False Start 允许客户端在发出自己的 Finished 后立即发送数据，Go 没有实现它。",
+      refs: [{ note: "T05", h: "为什么-tls-1.2-是两个往返" }, { rfc: 7918 }],
+    },
+    {
+      id: "app",
+      title: "[应用数据]",
+      side: 0,
+      at: { mark: "app:write", side: 0 },
+      code: { fn: T + "Conn.Write" },
+      tab: "record",
+      body: "应用数据用同一组会话密钥加密，外层类型就是真实类型 23，TLS 1.2 不隐藏记录类型。",
+    },
+  ],
+};
+
+export const tls12Rsa: ScenarioDef = {
+  id: "tls12-rsa",
+  tcp: true,
+  intro:
+    "`TLS_RSA_WITH_AES_128_GCM_SHA256`：没有 ServerKeyExchange，客户端直接用证书里的 RSA 公钥加密一个随机的预主密钥发给服务器。这条路在 TLS 1.3 里被整个删掉，Go 1.22 起也不在默认列表里，这里显式配置才能用上。看它是为了看清什么叫没有前向保密。",
+  steps: [
+    {
+      id: "server-wait",
+      title: "服务器等待 ClientHello",
+      side: 1,
+      at: { mark: "handshake", side: 1 },
+      code: { fn: T + "Conn.serverHandshake", find: "readClientHello" },
+      body: "这一侧的证书换成了 RSA 2048，叶子证书带有 keyEncipherment 用途，RSA 密钥传输需要它。",
+    },
+    {
+      id: "ch",
+      title: "ClientHello 只提供 RSA 密钥传输",
+      side: 0,
+      at: { enter: T + "Conn.makeClientHello" },
+      code: { fn: T + "Conn.makeClientHello" },
+      msg: { dir: 0, type: 1 },
+      body: "套件列表里只有一项。RSA 密钥传输套件从 Go 1.22 起需要显式写进 `CipherSuites`（或设置 GODEBUG `tlsrsakex=1`）才会出现。",
+      refs: [{ note: "T05", h: "rsa-密钥传输被删掉的那条路" }],
+    },
+    {
+      id: "server-flight",
+      title: "ServerHello、Certificate、ServerHelloDone",
+      side: 1,
+      at: { writeMsg: { dir: 1, type: 2 } },
+      code: { fn: T + "serverHandshakeState.doFullHandshake" },
+      msg: { dir: 1, type: 11 },
+      body: "没有 ServerKeyExchange，也就没有临时密钥和签名。服务器的长期 RSA 私钥同时承担了认证和密钥交换两件事。",
+    },
+    {
+      id: "cke",
+      title: "客户端加密预主密钥",
+      side: 0,
+      at: { enter: T + "rsaKeyAgreement.generateClientKeyExchange" },
+      code: { fn: T + "rsaKeyAgreement.generateClientKeyExchange", find: "rsa.EncryptPKCS1v15" },
+      msg: { dir: 0, type: 16 },
+      body:
+        "48 字节的预主密钥：前两字节是客户端版本，后 46 字节随机。客户端用 PKCS #1 v1.5 把它加密到服务器的 RSA 公钥，密文 256 字节，就在 ClientKeyExchange 里。\n\n这正是问题所在：谁拿到服务器私钥，谁就能解开这段密文，进而算出这条连接的全部密钥。今天录下的流量，在私钥泄露的那一天全部失守。",
+      refs: [{ note: "T02", h: "前向保密今天的私钥泄露不该解开昨天的流量" }, { rfc: 5246, sec: "7.4.7.1" }],
+    },
+    {
+      id: "finish",
+      title: "Finished 与应用数据",
+      side: 0,
+      at: { enter: T + "clientHandshakeState.sendFinished" },
+      code: { fn: T + "clientHandshakeState.sendFinished" },
+      msg: { dir: 0, type: 20 },
+      tab: "keys",
+      body: "客户端紧接着算出扩展主密钥、做 key expansion，发出 CCS 和 Finished，和 ECDHE 那一条完全相同，只是主密钥的输入换成了刚才加密传出去的预主密钥。",
+    },
+    {
+      id: "server-decrypt",
+      title: "服务器用常数时间解密",
+      side: 1,
+      at: { enter: T + "rsaKeyAgreement.processClientKeyExchange" },
+      code: { fn: T + "rsaKeyAgreement.processClientKeyExchange", find: "PKCS1v15DecryptOptions{SessionKeyLen: 48}" },
+      body:
+        "服务器解密时传入 `SessionKeyLen: 48`：填充不对时不报错，而是悄悄换成一个随机的预主密钥，让握手在 Finished 处失败。错误路径和正确路径耗时一样，攻击者无法从响应里分辨填充是否合法。\n\n这是对 1998 年 Bleichenbacher 攻击的防御。2017 年的 ROBOT 发现很多实现在这一点上仍然有漏洞，RSA 密钥传输最终被移除。",
+      refs: [{ note: "T04", h: "1998bleichenbacher-的百万消息攻击" }, { note: "T04", h: "2017robot" }],
+    },
+    {
+      id: "app",
+      title: "[应用数据]",
+      side: 0,
+      at: { mark: "app:write", side: 0 },
+      code: { fn: T + "Conn.Write" },
+      tab: "record",
+      body: "在线路上看，它和 ECDHE 那条连接的应用数据没有区别。区别只在私钥泄露之后。",
+    },
+  ],
+};

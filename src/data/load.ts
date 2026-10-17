@@ -1,0 +1,128 @@
+import { useEffect, useReducer } from "react";
+import type {
+  Calls,
+  Capture,
+  CaptureIndexEntry,
+  CodeFile,
+  CodeMeta,
+  Note,
+  NoteIndexEntry,
+  RefsFile,
+  RfcDoc,
+  RfcIndexEntry,
+  Sym,
+  SymbolsFile,
+} from "./types";
+
+const base = `${import.meta.env.BASE_URL}data/`;
+
+const cache = new Map<string, Promise<unknown>>();
+const settled = new Map<string, unknown>();
+
+function fetchJSON<T>(path: string): Promise<T> {
+  let p = cache.get(path) as Promise<T> | undefined;
+  if (!p) {
+    p = fetch(base + path).then(async (r) => {
+      if (!r.ok) throw new Error(`${path}: HTTP ${r.status}`);
+      const v = (await r.json()) as T;
+      settled.set(path, v);
+      return v;
+    });
+    // A failed fetch must not stay cached, so retry can work.
+    p.catch(() => cache.delete(path));
+    cache.set(path, p);
+  }
+  return p;
+}
+
+/** Synchronous read of something already loaded, for render paths. */
+export function peek<T>(path: string): T | undefined {
+  return settled.get(path) as T | undefined;
+}
+
+export const paths = {
+  codeMeta: "code/meta.json",
+  symbols: "code/symbols.json",
+  calls: "code/calls.json",
+  file: (p: string) => `code/files/${p}.json`,
+  refs: (pkg: string) => `code/refs/${pkg.replaceAll("/", "_")}.json`,
+  captures: "captures/index.json",
+  capture: (id: string) => `captures/${id}.json`,
+  notes: "notes/index.json",
+  note: (id: string) => `notes/${id}.json`,
+  rfcs: "rfc/index.json",
+  rfc: (n: number) => `rfc/rfc${n}.json`,
+};
+
+export const load = {
+  codeMeta: () => fetchJSON<CodeMeta>(paths.codeMeta),
+  symbols: () => fetchJSON<SymbolsFile>(paths.symbols).then(indexSymbols),
+  calls: () => fetchJSON<Calls>(paths.calls),
+  /** "8446#4.1.2" -> [file index, line] of Go comments citing it. */
+  rfcRefs: () => fetchJSON<Record<string, [number, number][]>>("code/rfcrefs.json"),
+  file: (p: string) => fetchJSON<CodeFile>(paths.file(p)),
+  refs: (pkg: string) => fetchJSON<RefsFile>(paths.refs(pkg)),
+  captures: () => fetchJSON<CaptureIndexEntry[]>(paths.captures),
+  capture: (id: string) => fetchJSON<Capture>(paths.capture(id)),
+  notes: () => fetchJSON<NoteIndexEntry[]>(paths.notes),
+  note: (id: string) => fetchJSON<Note>(paths.note(id)),
+  rfcs: () => fetchJSON<RfcIndexEntry[]>(paths.rfcs),
+  rfc: (n: number) => fetchJSON<RfcDoc>(paths.rfc(n)),
+};
+
+export interface SymbolIndex {
+  files: string[];
+  list: Sym[];
+  byKey: Map<string, Sym>;
+}
+
+const symbolIndexes = new WeakMap<SymbolsFile, SymbolIndex>();
+
+function indexSymbols(f: SymbolsFile): SymbolIndex {
+  let ix = symbolIndexes.get(f);
+  if (!ix) {
+    ix = { files: f.files, list: f.symbols, byKey: new Map(f.symbols.map((s) => [s.k, s])) };
+    symbolIndexes.set(f, ix);
+  }
+  return ix;
+}
+
+export type Loadable<T> =
+  | { state: "loading"; data?: undefined; error?: undefined; retry: () => void }
+  | { state: "ready"; data: T; error?: undefined; retry: () => void }
+  | { state: "error"; data?: undefined; error: Error; retry: () => void };
+
+/**
+ * useLoad runs a loader keyed by `key` and re-renders when it settles. The
+ * key must change whenever the loader would load something different.
+ */
+export function useLoad<T>(key: string | null, loader: () => Promise<T>): Loadable<T> {
+  const [state, set] = useReducer(
+    (_: Store<T>, next: Store<T>) => next,
+    { key: null, state: "loading" } as Store<T>,
+  );
+  useEffect(() => {
+    if (key === null) return;
+    let live = true;
+    loader().then(
+      (data) => live && set({ key, state: "ready", data }),
+      (error: Error) => live && set({ key, state: "error", error }),
+    );
+    return () => {
+      live = false;
+    };
+    // The loader is identified by the key.
+  }, [key, state.retries]);
+  const retry = () => set({ key: null, state: "loading", retries: (state.retries ?? 0) + 1 });
+  if (key === null || state.key !== key || state.state === "loading") return { state: "loading", retry };
+  if (state.state === "error") return { state: "error", error: state.error!, retry };
+  return { state: "ready", data: state.data as T, retry };
+}
+
+interface Store<T> {
+  key: string | null;
+  state: "loading" | "ready" | "error";
+  data?: T;
+  error?: Error;
+  retries?: number;
+}

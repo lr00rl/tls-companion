@@ -1,0 +1,155 @@
+.transport {
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  padding: 6px 10px 6px;
+  flex: none;
+}
+.transport-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.scenario-pick select,
+.rtt select {
+  height: 28px;
+  max-width: 220px;
+  padding: 0 24px 0 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--paper);
+  font-size: var(--fs-13);
+  font-weight: 600;
+  cursor: pointer;
+}
+.rtt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-11);
+  color: var(--muted);
+  font-family: var(--font-mono);
+}
+.rtt select {
+  font-weight: 400;
+  font-family: var(--font-mono);
+  font-size: var(--fs-12);
+}
+.controls {
+  display: flex;
+  gap: 2px;
+}
+.controls .play {
+  background: var(--accent);
+  color: var(--on-accent);
+  width: 34px;
+}
+.controls .play:hover {
+  background: var(--accent-ink);
+  color: var(--on-accent);
+}
+.step-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.step-count {
+  font-size: var(--fs-12);
+  color: var(--muted);
+}
+.step-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.seg-ctl {
+  display: flex;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.seg-ctl .btn {
+  border-radius: 0;
+  height: 26px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-11);
+}
+
+.scrubber {
+  position: relative;
+  height: 28px;
+  margin-top: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  cursor: pointer;
+  touch-action: none;
+  overflow: hidden;
+}
+.scrubber:focus-visible {
+  outline: 2px solid var(--accent);
+}
+.scrubber svg {
+  display: block;
+}
+.seg-bg {
+  fill: transparent;
+}
+.seg-bg.odd {
+  fill: var(--well);
+}
+.seg-bg.cur {
+  fill: var(--accent-wash);
+}
+.run.side-0 {
+  fill: oklch(from var(--ink-2) l c h / 0.5);
+}
+.run.side-1 {
+  fill: oklch(from var(--syn-type) l c h / 0.6);
+}
+.write-tick {
+  stroke: var(--ink);
+  stroke-width: 1.5;
+}
+.step-edge {
+  stroke: var(--line-strong);
+  stroke-width: 1;
+}
+.playhead {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  left: -1px;
+  width: 3px;
+  background: var(--accent);
+  border-radius: 2px;
+  box-shadow: 0 0 0 2px var(--paper);
+  pointer-events: none;
+}
+.scrub-legend {
+  position: absolute;
+  right: 4px;
+  top: 2px;
+  display: flex;
+  flex-direction: column;
+  font-size: 8.5px;
+  line-height: 11px;
+  color: var(--faint);
+  pointer-events: none;
+  text-align: right;
+}
+@media (max-width: 1100px) {
+  .hide-md {
+    display: none !important;
+  }
+}
+@media (max-width: 600px) {
+  .scenario-pick select {
+    max-width: 150px;
+  }
+  .step-title .step-name {
+    display: none;
+  }
+}

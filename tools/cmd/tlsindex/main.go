@@ -136,6 +136,8 @@ type indexer struct {
 	refs     map[string][]ref
 	calls    map[string][]string
 	external map[string]bool
+	// rfcRefs maps "8446#4.1.2" (or "8446") to the comment lines citing it.
+	rfcRefs map[string][][2]int
 }
 
 func main() {
@@ -154,6 +156,7 @@ func main() {
 		refs:     map[string][]ref{},
 		calls:    map[string][]string{},
 		external: map[string]bool{},
+		rfcRefs:  map[string][][2]int{},
 	}
 	for _, p := range indexed {
 		ix.isIndex[p] = true
@@ -208,6 +211,7 @@ func main() {
 	ix.writeSymbols(*out)
 	ix.writeRefs(*out)
 	writeJSON(filepath.Join(*out, "calls.json"), ix.calls)
+	writeJSON(filepath.Join(*out, "rfcrefs.json"), ix.rfcRefs)
 	writeJSON(filepath.Join(*out, "meta.json"), m)
 	log.Printf("indexed %d files, %d symbols in %s", len(ix.files), len(ix.symbols), time.Since(start).Round(time.Millisecond))
 }
@@ -568,7 +572,13 @@ func (ix *indexer) indexFile(p *packages.Package, name string, src []byte, af *a
 		off := tf.Offset(pos)
 		switch {
 		case tok == token.COMMENT:
-			ix.emitComment(src, off, off+len(lit), emit, refOf)
+			ix.emitComment(src, off, off+len(lit), emit, func(r string, at int) int {
+				if strings.HasPrefix(r, "rfc:") {
+					l, _ := lineCol(at)
+					ix.rfcRefs[r[4:]] = append(ix.rfcRefs[r[4:]], [2]int{fileIdx, l})
+				}
+				return refOf(r)
+			})
 		case tok == token.STRING || tok == token.CHAR:
 			emit(off, off+len(lit), kString, -1)
 		case tok == token.INT || tok == token.FLOAT || tok == token.IMAG:
@@ -658,7 +668,7 @@ func kindOf(obj types.Object) int {
 	return kIdent
 }
 
-func (ix *indexer) emitComment(src []byte, start, end int, emit func(int, int, int, int), refOf func(string) int) {
+func (ix *indexer) emitComment(src []byte, start, end int, emit func(int, int, int, int), refOf func(ref string, at int) int) {
 	text := string(src[start:end])
 	type span struct {
 		s, e int
@@ -708,7 +718,7 @@ func (ix *indexer) emitComment(src []byte, start, end int, emit func(int, int, i
 			continue
 		}
 		emit(start+cur, start+s.s, kComment, -1)
-		emit(start+s.s, start+s.e, kLink, refOf(s.ref))
+		emit(start+s.s, start+s.e, kLink, refOf(s.ref, start+s.s))
 		cur = s.e
 	}
 	emit(start+cur, end, kComment, -1)

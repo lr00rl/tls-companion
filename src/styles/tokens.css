@@ -1,0 +1,180 @@
+/* The single source of color, type, spacing, and motion values. See docs/DESIGN.md. */
+
+:root {
+  color-scheme: light;
+  --paper: oklch(0.985 0.003 240);
+  --panel: oklch(0.972 0.005 240);
+  --well: oklch(0.952 0.006 240);
+  --hover: oklch(0.94 0.008 245);
+  --line: oklch(0.905 0.008 240);
+  --line-strong: oklch(0.83 0.01 245);
+  --ink: oklch(0.24 0.02 255);
+  --ink-2: oklch(0.4 0.018 255);
+  --muted: oklch(0.54 0.015 255);
+  --faint: oklch(0.68 0.012 255);
+
+  --accent: oklch(0.5 0.17 258);
+  --accent-ink: oklch(0.42 0.16 258);
+  --accent-wash: oklch(0.93 0.045 258);
+  --accent-line: oklch(0.78 0.09 258);
+  --on-accent: oklch(0.99 0.005 258);
+
+  /* Protection epochs: which secret protects a record. */
+  --ep-plain: oklch(0.6 0.01 250);
+  --ep-plain-wash: oklch(0.93 0.004 250);
+  --ep-early: oklch(0.68 0.15 70);
+  --ep-early-wash: oklch(0.94 0.05 75);
+  --ep-hs: oklch(0.56 0.17 350);
+  --ep-hs-wash: oklch(0.94 0.04 350);
+  --ep-app: oklch(0.56 0.13 155);
+  --ep-app-wash: oklch(0.94 0.045 155);
+  --ep-alert: oklch(0.52 0.19 28);
+  --ep-alert-wash: oklch(0.94 0.04 28);
+  --ep-tcp: oklch(0.7 0.02 230);
+
+  --ok: oklch(0.52 0.12 155);
+  --warn: oklch(0.6 0.13 70);
+  --err: oklch(0.52 0.19 28);
+
+  /* Go syntax. */
+  --syn-keyword: oklch(0.42 0.12 300);
+  --syn-comment: oklch(0.55 0.02 240);
+  --syn-string: oklch(0.47 0.11 150);
+  --syn-number: oklch(0.5 0.13 45);
+  --syn-func: oklch(0.42 0.14 258);
+  --syn-type: oklch(0.45 0.09 205);
+  --syn-field: oklch(0.44 0.08 60);
+  --syn-const: oklch(0.47 0.14 335);
+  --syn-builtin: oklch(0.46 0.1 285);
+  --syn-local: oklch(0.3 0.02 255);
+  --syn-package: oklch(0.42 0.03 255);
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC",
+    "Microsoft YaHei", sans-serif;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, "PingFang SC",
+    monospace;
+  --font-display: "Noto Serif SC", "Songti SC", "STSong", serif;
+
+  --fs-11: 0.6875rem;
+  --fs-12: 0.75rem;
+  --fs-13: 0.8125rem;
+  --fs-14: 0.875rem;
+  --fs-16: 1rem;
+  --fs-18: 1.125rem;
+  --fs-22: 1.375rem;
+  --fs-28: 1.75rem;
+  --fs-36: 2.25rem;
+
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+
+  --radius: 6px;
+  --radius-sm: 4px;
+  --code-line: 20px;
+  --bar-h: 44px;
+
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --t-fast: 140ms;
+  --shadow-pop: 0 1px 2px oklch(0.2 0.02 255 / 0.08), 0 8px 24px oklch(0.2 0.02 255 / 0.12);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: oklch(0.17 0.01 255);
+  --panel: oklch(0.195 0.012 255);
+  --well: oklch(0.215 0.012 255);
+  --hover: oklch(0.25 0.014 255);
+  --line: oklch(0.29 0.012 255);
+  --line-strong: oklch(0.37 0.014 255);
+  --ink: oklch(0.93 0.008 255);
+  --ink-2: oklch(0.8 0.01 255);
+  --muted: oklch(0.66 0.012 255);
+  --faint: oklch(0.5 0.012 255);
+
+  --accent: oklch(0.72 0.13 258);
+  --accent-ink: oklch(0.8 0.1 258);
+  --accent-wash: oklch(0.3 0.06 258);
+  --accent-line: oklch(0.5 0.1 258);
+  --on-accent: oklch(0.17 0.02 258);
+
+  --ep-plain: oklch(0.68 0.01 250);
+  --ep-plain-wash: oklch(0.27 0.006 250);
+  --ep-early: oklch(0.78 0.12 70);
+  --ep-early-wash: oklch(0.3 0.05 70);
+  --ep-hs: oklch(0.74 0.12 350);
+  --ep-hs-wash: oklch(0.3 0.05 350);
+  --ep-app: oklch(0.74 0.11 155);
+  --ep-app-wash: oklch(0.29 0.045 155);
+  --ep-alert: oklch(0.7 0.14 28);
+  --ep-alert-wash: oklch(0.3 0.05 28);
+  --ep-tcp: oklch(0.55 0.02 230);
+
+  --ok: oklch(0.74 0.11 155);
+  --warn: oklch(0.78 0.12 70);
+  --err: oklch(0.7 0.14 28);
+
+  --syn-keyword: oklch(0.76 0.11 300);
+  --syn-comment: oklch(0.62 0.02 240);
+  --syn-string: oklch(0.76 0.1 150);
+  --syn-number: oklch(0.77 0.11 55);
+  --syn-func: oklch(0.78 0.1 250);
+  --syn-type: oklch(0.79 0.08 200);
+  --syn-field: oklch(0.8 0.07 75);
+  --syn-const: oklch(0.78 0.11 340);
+  --syn-builtin: oklch(0.77 0.09 285);
+  --syn-local: oklch(0.88 0.01 255);
+  --syn-package: oklch(0.75 0.02 255);
+
+  --shadow-pop: 0 1px 2px oklch(0 0 0 / 0.3), 0 10px 30px oklch(0 0 0 / 0.45);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: oklch(0.17 0.01 255);
+    --panel: oklch(0.195 0.012 255);
+    --well: oklch(0.215 0.012 255);
+    --hover: oklch(0.25 0.014 255);
+    --line: oklch(0.29 0.012 255);
+    --line-strong: oklch(0.37 0.014 255);
+    --ink: oklch(0.93 0.008 255);
+    --ink-2: oklch(0.8 0.01 255);
+    --muted: oklch(0.66 0.012 255);
+    --faint: oklch(0.5 0.012 255);
+    --accent: oklch(0.72 0.13 258);
+    --accent-ink: oklch(0.8 0.1 258);
+    --accent-wash: oklch(0.3 0.06 258);
+    --accent-line: oklch(0.5 0.1 258);
+    --on-accent: oklch(0.17 0.02 258);
+    --ep-plain: oklch(0.68 0.01 250);
+    --ep-plain-wash: oklch(0.27 0.006 250);
+    --ep-early: oklch(0.78 0.12 70);
+    --ep-early-wash: oklch(0.3 0.05 70);
+    --ep-hs: oklch(0.74 0.12 350);
+    --ep-hs-wash: oklch(0.3 0.05 350);
+    --ep-app: oklch(0.74 0.11 155);
+    --ep-app-wash: oklch(0.29 0.045 155);
+    --ep-alert: oklch(0.7 0.14 28);
+    --ep-alert-wash: oklch(0.3 0.05 28);
+    --ep-tcp: oklch(0.55 0.02 230);
+    --ok: oklch(0.74 0.11 155);
+    --warn: oklch(0.78 0.12 70);
+    --err: oklch(0.7 0.14 28);
+    --syn-keyword: oklch(0.76 0.11 300);
+    --syn-comment: oklch(0.62 0.02 240);
+    --syn-string: oklch(0.76 0.1 150);
+    --syn-number: oklch(0.77 0.11 55);
+    --syn-func: oklch(0.78 0.1 250);
+    --syn-type: oklch(0.79 0.08 200);
+    --syn-field: oklch(0.8 0.07 75);
+    --syn-const: oklch(0.78 0.11 340);
+    --syn-builtin: oklch(0.77 0.09 285);
+    --syn-local: oklch(0.88 0.01 255);
+    --syn-package: oklch(0.75 0.02 255);
+    --shadow-pop: 0 1px 2px oklch(0 0 0 / 0.3), 0 10px 30px oklch(0 0 0 / 0.45);
+  }
+}

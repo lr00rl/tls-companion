@@ -47,6 +47,7 @@ type record struct {
 	Prot    *protection `json:"prot,omitempty"`
 	Inner   int         `json:"inner"`
 	Plain   string      `json:"plain"`
+	Raw     string      `json:"raw"`
 	Padding int         `json:"pad,omitempty"`
 
 	plain []byte
@@ -185,6 +186,7 @@ func decode(r *recorder) ([]record, []message, session, error) {
 		payload := s[rec.Off+5 : rec.Off+5+rec.Len]
 		header := s[rec.Off : rec.Off+5]
 		rec.plain = payload
+		rec.Raw = hex.EncodeToString(s[rec.Off : rec.Off+5+rec.Len])
 
 		switch {
 		case sess.version == 0x0304 && rec.Type == ctApplicationData:
