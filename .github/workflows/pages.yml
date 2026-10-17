@@ -1,0 +1,59 @@
+name: pages
+
+# Builds everything from primary sources on every push: the Go index and the
+# handshake captures from the pinned toolchain, the notes and RFCs from content/,
+# then the site. Tests fail the build when a step, field, or history entry no
+# longer resolves against the regenerated data.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          # The index links to golang/go at this tag; keep it in step with tools/go.mod.
+          go-version: "1.26.1"
+          cache-dependency-path: tools/go.sum
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Index crypto/tls and record handshakes
+        run: node scripts/data.mjs
+      - name: Build notes and RFCs
+        run: |
+          node scripts/build-notes.mjs
+          node scripts/build-rfc.mjs
+      - run: pnpm test
+      - run: pnpm build
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

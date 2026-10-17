@@ -65,6 +65,45 @@ md.renderer.rules.link_open = (tokens, i, opts, env, self) => {
   return defaultLink(tokens, i, opts, env, self);
 };
 
+// Turn "RFC 8446 §4.1.3" and "RFC 8446 附录 D.4" in prose into links the
+// reader opens in its RFC drawer.
+const rfcMention = /RFC ?(\d{3,5})(?:\s*(?:§\s*|附录\s*|Section\s+)([A-Z](?:\.\d+)*|\d+(?:\.\d+)*))?/g;
+md.core.ruler.push("rfc_links", (state) => {
+  for (const block of state.tokens) {
+    if (block.type !== "inline" || !block.children) continue;
+    const out = [];
+    let inLink = 0;
+    for (const t of block.children) {
+      if (t.type === "link_open") inLink++;
+      if (t.type === "link_close") inLink--;
+      if (t.type !== "text" || inLink || !rfcMention.test(t.content)) {
+        out.push(t);
+        continue;
+      }
+      rfcMention.lastIndex = 0;
+      let last = 0;
+      for (const m of t.content.matchAll(rfcMention)) {
+        if (m.index > last) {
+          const tt = new state.Token("text", "", 0);
+          tt.content = t.content.slice(last, m.index);
+          out.push(tt);
+        }
+        const h = new state.Token("html_inline", "", 0);
+        const sec = m[2] ? `/${m[2]}` : "";
+        h.content = `<a class="rfc-ref" href="#/rfc/${m[1]}${sec}" data-rfc="${m[1]}"${m[2] ? ` data-sec="${m[2]}"` : ""}>${md.utils.escapeHtml(m[0])}</a>`;
+        out.push(h);
+        last = m.index + m[0].length;
+      }
+      if (last < t.content.length) {
+        const tt = new state.Token("text", "", 0);
+        tt.content = t.content.slice(last);
+        out.push(tt);
+      }
+    }
+    block.children = out;
+  }
+});
+
 md.renderer.rules.heading_open = (tokens, i, opts, env, self) => {
   const inline = tokens[i + 1];
   const text = inline.children.filter((c) => c.type === "text" || c.type === "code_inline").map((c) => c.content).join("");

@@ -206,6 +206,16 @@ export function messageName(m: HsMessage): string {
   return handshakeShort[m.type] ?? `handshake(${m.type})`;
 }
 
+/** The epoch protecting most of a set of records' bytes. */
+export function dominantEpoch(model: Model, records: number[]): Epoch {
+  const bytes = new Map<Epoch, number>();
+  for (const ri of records) bytes.set(model.recordEpoch[ri], (bytes.get(model.recordEpoch[ri]) ?? 0) + model.cap.records[ri].len);
+  let best: Epoch = "plain";
+  let n = -1;
+  for (const [ep, b] of bytes) if (b > n) [best, n] = [ep, b];
+  return best;
+}
+
 /** Label in RFC 8446 notation: {} for handshake keys, [] for application keys. */
 export function wrapEpoch(label: string, ep: Epoch): string {
   if (ep === "hs") return `{${label}}`;

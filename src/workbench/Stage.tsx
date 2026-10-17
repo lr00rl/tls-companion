@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { executingAt, useWB } from "../app/store";
-import { recordLabel, shortFn, type Epoch, type Model } from "../capture/model";
+import { dominantEpoch, recordLabel, shortFn, type Epoch, type Model } from "../capture/model";
 import type { Side } from "../data/types";
 import { useEased, useSize } from "./clock";
 import "./stage.css";
@@ -128,7 +128,7 @@ export function Stage({ tcp }: { tcp: boolean }) {
               const y1 = y(f.tSend);
               const y2 = y(f.tArrive);
               const p = Math.max(0, Math.min(1, (t - f.tSend) / (f.tArrive - f.tSend)));
-              const ep = f.tcp ? "tcp" : model.recordEpoch[f.records[f.records.length - 1]] ?? "plain";
+              const ep = f.tcp ? "tcp" : dominantEpoch(model, f.records);
               const len = Math.hypot(x2 - x1, y2 - y1);
               return (
                 <g key={f.id} className={`flight ep${p === 0 ? " future" : ""}`} data-ep={ep}>

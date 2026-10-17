@@ -33,8 +33,9 @@ export function RfcText({ doc, section, window: win, onSection, bundled }: Props
       box.current?.scrollTo({ top: 0 });
       return;
     }
-    const el = box.current?.querySelector(`[data-l="${start}"]`) as HTMLElement | null;
-    if (el && box.current) box.current.scrollTop = el.offsetTop - 12;
+    const b = box.current;
+    const el = b?.querySelector(`[data-l="${start}"]`) as HTMLElement | null;
+    if (el && b) b.scrollTop += el.getBoundingClientRect().top - b.getBoundingClientRect().top - 12;
   }, [start, win, doc]);
 
   const sectionLines = useMemo(() => new Map(doc.sections.map((s) => [s.line, s])), [doc]);

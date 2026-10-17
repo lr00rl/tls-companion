@@ -8,13 +8,12 @@
     "preview": "vite preview",
     "typecheck": "tsc -p .",
     "test": "vitest run",
-    "data": "node scripts/data.mjs",
-    "data:code": "node scripts/data.mjs code",
-    "data:captures": "node scripts/data.mjs captures",
+    "data": "node scripts/data.mjs && node scripts/build-notes.mjs && node scripts/build-rfc.mjs",
     "data:notes": "node scripts/build-notes.mjs",
     "data:rfc": "node scripts/build-rfc.mjs",
     "sync:notes": "node scripts/sync-notes.mjs",
-    "validate": "node scripts/validate.mjs"
+    "data:go": "node scripts/data.mjs",
+    "fetch:rfc": "node scripts/fetch-rfc.mjs"
   },
   "dependencies": {
     "@fontsource-variable/jetbrains-mono": "^5.3.0",
@@ -34,5 +33,6 @@
     "typescript": "^7.0.2",
     "vite": "^8.3.4",
     "vitest": "^5.0.5"
-  }
+  },
+  "packageManager": "pnpm@12.10.0"
 }

@@ -5,5 +5,6 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   base: "/tls-companion/",
   plugins: [react()],
-  build: { target: "es2022", chunkSizeWarningLimit: 1200 },
+  // Mermaid's ELK layout chunk is ~1.4 MB but loads only for notes that use it.
+  build: { target: "es2022", chunkSizeWarningLimit: 1600 },
 });

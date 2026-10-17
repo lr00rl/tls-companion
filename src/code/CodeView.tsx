@@ -145,6 +145,8 @@ export function CodeView({ target, symbols, goVersion, onNavigate, onRfc, exec, 
   const first = Math.max(0, Math.floor(scroll.top / LINE) - OVERSCAN);
   const last = Math.min(total, Math.ceil((scroll.top + scroll.height) / LINE) + OVERSCAN);
   const decl = data && caret ? enclosingDecl(data, caret) : null;
+  // Without an explicit range, tint the function or type around the caret.
+  const effRange = target?.range ?? (decl && decl.end - decl.start < 400 ? ([decl.start, decl.end] as [number, number]) : undefined);
   const declSym = decl && symbols?.byKey.get(decl.ref);
   const [pkgPath] = target ? [target.file.split("/").slice(0, -1).join("/")] : [""];
 
@@ -171,7 +173,7 @@ export function CodeView({ target, symbols, goVersion, onNavigate, onRfc, exec, 
         pos = s + n;
       }
       if (pos < text.length) parts.push(text.slice(pos));
-      const inRange = target?.range && ln >= target.range[0] && ln <= target.range[1];
+      const inRange = effRange && ln >= effRange[0] && ln <= effRange[1];
       const calls = execLines?.get(ln);
       rows.push(
         <div

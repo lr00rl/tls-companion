@@ -61,3 +61,31 @@ for (const def of scenarioDefs) {
     }
   });
 }
+
+describe("history", async () => {
+  const { entries } = await import("../src/history/entries");
+  for (const e of entries) {
+    it(`${e.id}: code, links, and text resolve`, () => {
+      for (const c of e.code ?? []) {
+        expect(byKey.has(c.fn), `symbol ${c.fn}`).toBe(true);
+        expect(byKey.get(c.fn)!.x, `${c.fn} is indexed`).toBeUndefined();
+        if (c.find) expect(lineOf(c.fn, c.find), `"${c.find}" in ${c.fn}`).toBeGreaterThan(0);
+      }
+      if (e.play) {
+        const def = scenarioDefs.find((d) => d.id === e.play![0]);
+        expect(def?.steps.map((s) => s.id), `step ${e.play.join("/")}`).toContain(e.play[1]);
+      }
+      if (e.note) {
+        const n = notes.find((x) => x.id === e.note![0]);
+        expect(n, `note ${e.note[0]}`).toBeTruthy();
+        if (e.note[1]) expect(n!.headings.map((h) => h.anchor)).toContain(e.note[1]);
+      }
+      for (const [n, sec] of e.rfcs ?? []) {
+        const doc = rfcs.find((x) => x.n === n);
+        expect(doc, `RFC ${n} bundled`).toBeTruthy();
+        if (sec) expect(doc!.sections.map((x) => x.id)).toContain(sec);
+      }
+      expect(`${e.title}${e.problem}${e.fix ?? ""}${e.go ?? ""}`).not.toMatch(/[–—]/);
+    });
+  }
+});
