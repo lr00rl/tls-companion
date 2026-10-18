@@ -63,7 +63,8 @@ function DesktopLayout({ tcp, wide, defId }: { tcp: boolean; wide: boolean; defI
   const [right, setRight] = usePref("wb.right", 620);
   const [stageH, setStageH] = usePref("wb.stage", 400);
   const [traceH, setTraceH] = usePref("wb.trace", 260);
-  const [cardOpen, setCardOpen] = usePref("wb.card", true);
+  // Short windows start with the step text folded; the reader's choice is kept.
+  const [cardOpen, setCardOpen] = usePref("wb.card", window.innerHeight >= 720);
   const [drawer, setDrawer] = useState(false);
   const step = useWB((s) => s.step);
   const steps = useWB((s) => s.steps);
@@ -231,7 +232,7 @@ function useKeys() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
-      if (t.closest("input, textarea, select, [role=slider], [role=separator], [role=tree], [contenteditable]") || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (t.closest("input, textarea, select, [contenteditable], [role=dialog]") || e.metaKey || e.ctrlKey || e.altKey) return;
       const wb = useWB.getState();
       if (e.key === "ArrowRight") {
         e.preventDefault();

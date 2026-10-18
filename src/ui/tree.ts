@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent, type MouseEvent } from "react";
+import { useRef, useState, type FocusEvent, type KeyboardEvent } from "react";
 
 export interface TreeRow {
   key: string;
@@ -13,18 +13,28 @@ export interface TreeRow {
  * The tree is one tab stop. Up and Down move between visible rows, Right
  * opens a row or steps into its first child, Left closes a row or steps out to
  * its parent, Home and End jump to the ends, and Enter or Space does what a
- * click does. Handled keys stop here, so the workbench's own arrow keys (step
- * back and forward) do not fire while the tree has focus.
+ * click does. Keys the tree handles stop here; the rest reach the
+ * workbench, whose Left and Right change step.
  */
 export function useTreeNav(rows: TreeRow[], preferred: string | undefined, ops: { toggle(key: string): void; activate(key: string): void }) {
   const [active, setActive] = useState<string | null>(null);
   const has = (k: string | null | undefined) => !!k && rows.some((r) => r.key === k);
   const current = has(active) ? active! : has(preferred) ? preferred! : rows[0]?.key;
+  // Set by a pointer press on a row, cleared once the keyboard takes over or
+  // focus leaves. :focus-visible cannot tell: browsers turn it on for the
+  // focused element as soon as a key is pressed, before the handler runs.
+  const byPointer = useRef(false);
 
   const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
-    const at = (document.activeElement as HTMLElement | null)?.dataset.treeKey;
-    const i = rows.findIndex((r) => r.key === at);
+    const el = document.activeElement as HTMLElement | null;
+    const i = rows.findIndex((r) => r.key === el?.dataset.treeKey);
     if (i < 0) return;
+    // A row focused by a click takes only Up, Down, Home, and End, which start
+    // keyboard use; Left, Right, Enter, and Space go on to the workbench, so
+    // clicking a field and pressing Right still steps.
+    const moves = ["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key);
+    if (byPointer.current && !moves) return;
+    if (moves) byPointer.current = false;
     const r = rows[i];
     let to = -1;
     switch (e.key) {
@@ -63,14 +73,21 @@ export function useTreeNav(rows: TreeRow[], preferred: string | undefined, ops: 
     e.currentTarget.querySelector<HTMLElement>(`[data-tree-key="${CSS.escape(key)}"]`)?.focus();
   };
 
-  // A click selects a row without focusing it, so the arrow keys keep stepping
-  // the workbench for pointer users; keyboard users reach the tree with Tab.
   const rowProps = (key: string) => ({
     "data-tree-key": key,
     tabIndex: key === current ? 0 : -1,
     onFocus: () => setActive(key),
-    onMouseDown: (e: MouseEvent) => e.preventDefault(),
+    onPointerDown: () => {
+      byPointer.current = true;
+    },
   });
 
-  return { onKeyDown, rowProps };
+  const onBlur = (e: FocusEvent<HTMLElement>) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) byPointer.current = false;
+  };
+
+  /** Spread on the element with role="tree". */
+  const treeProps = { onKeyDown, onBlur };
+
+  return { treeProps, rowProps };
 }

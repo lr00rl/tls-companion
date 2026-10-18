@@ -192,7 +192,7 @@ function FieldsTab({ model }: { model: Model }) {
           className="field-tree"
           role="tree"
           aria-label={`${view.title} 的字段`}
-          onKeyDown={nav.onKeyDown}
+          {...nav.treeProps}
           onPointerLeave={() => useWB.getState().setHover(selected ? [selected.start, selected.end] : null)}
         >
           {rows}

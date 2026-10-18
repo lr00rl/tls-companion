@@ -111,8 +111,9 @@
 .marker-label.right {
   transform: translate(calc(-100% - 10px), 2px);
 }
+/* Future text is dimmed with a token rather than opacity, so it keeps 4.5:1. */
 .marker-label.future {
-  opacity: 0.45;
+  color: var(--faint);
   font-weight: 400;
 }
 
@@ -220,7 +221,7 @@
   font-size: 10px;
 }
 .tcp-label.future {
-  opacity: 0.35;
+  color: var(--faint);
 }
 
 .exec-tag {
@@ -243,7 +244,7 @@
 .now-tag {
   position: absolute;
   right: 6px;
-  transform: translateY(4px);
+  transform: translateY(calc(-100% - 3px));
   font-size: 10px;
   color: var(--accent-ink);
   background: var(--paper);

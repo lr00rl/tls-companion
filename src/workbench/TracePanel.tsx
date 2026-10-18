@@ -101,7 +101,7 @@ export function TracePanel() {
           </button>
         </div>
       </div>
-      <div className="panel-body tr-list" ref={list} role="tree" aria-label="调用追踪" onKeyDown={nav.onKeyDown}>
+      <div className="panel-body tr-list" ref={list} role="tree" aria-label="调用追踪" {...nav.treeProps}>
         {rows.length === 0 && <div className="empty">这一步里没有被追踪的 crypto/tls 调用。</div>}
         {rows.map(({ call, depth, repeat, hasKids }) => {
           const isOpen = open.has(call.id);

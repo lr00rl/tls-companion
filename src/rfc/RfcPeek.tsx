@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { href, navigate } from "../app/route";
 import { rfcEditorUrl, usePeek } from "../app/peek";
 import { useWB } from "../app/store";
@@ -16,6 +16,17 @@ export function RfcPeek() {
   const doc = useLoad(isBundled ? `rfc:${rfc!.n}` : null, () => load.rfc(rfc!.n));
   const cites = useLoad("rfcrefs", load.rfcRefs);
   const symbols = useWB((s) => s.symbols);
+  // The drawer takes focus when it opens and hands it back when it closes.
+  const panel = useRef<HTMLElement>(null);
+  const shown = !!rfc && !!isBundled;
+  useEffect(() => {
+    if (!shown) return;
+    const opener = document.activeElement as HTMLElement | null;
+    panel.current?.focus();
+    return () => {
+      if (opener?.isConnected) opener.focus({ preventScroll: true });
+    };
+  }, [shown]);
 
   useEffect(() => {
     if (!rfc) return;
@@ -39,7 +50,7 @@ export function RfcPeek() {
 
   return (
     <div className="peek-scrim" onClick={close}>
-      <aside className="peek" onClick={(e) => e.stopPropagation()} aria-label={`RFC ${rfc.n}`}>
+      <aside ref={panel} className="peek" role="dialog" aria-modal="true" tabIndex={-1} onClick={(e) => e.stopPropagation()} aria-label={`RFC ${rfc.n}`}>
         <header className="peek-head">
           <div>
             <div className="kicker">RFC {rfc.n}{doc.state === "ready" ? ` · ${doc.data.date}` : ""}</div>

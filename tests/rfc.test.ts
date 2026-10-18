@@ -60,3 +60,16 @@ describe("figureLines", () => {
     expect(fig.has(at("is reduced -- as, for"))).toBe(false);
   });
 });
+
+describe("figureLines on presentation-language structs", () => {
+  const doc = JSON.parse(readFileSync(new URL("../public/data/rfc/rfc8446.json", import.meta.url), "utf8")) as RfcDoc;
+  const fig = figureLines(doc.lines);
+
+  it("keeps every struct and enum block, however short, as a figure", () => {
+    const opens = doc.lines.map((l, i) => [l.trim(), i] as const).filter(([t]) => /^(struct|enum)\b.*\{$/.test(t) || t === "struct {" || t === "enum {");
+    expect(opens.length).toBeGreaterThan(30);
+    for (const [, i] of opens) expect(fig.has(i), doc.lines[i]).toBe(true);
+    const short = doc.lines.findIndex((l) => l.includes("KeyShareEntry client_shares<0..2^16-1>;"));
+    expect(fig.has(short)).toBe(true);
+  });
+});

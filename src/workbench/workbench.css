@@ -307,9 +307,6 @@ body.resizing-y * {
   background: var(--accent-wash);
   box-shadow: inset 2px 0 0 var(--accent);
 }
-.tr-row.later {
-  opacity: 0.55;
-}
 .tr-side {
   flex: none;
   width: 14px;
@@ -324,6 +321,18 @@ body.resizing-y * {
 }
 .tr-row.side-1 .tr-side {
   background: var(--syn-type);
+}
+/* Calls after the cursor are dimmed with tokens rather than opacity, so they keep 4.5:1. */
+.tr-row.later .tr-fn {
+  color: var(--muted);
+}
+.tr-row.later .tr-site,
+.tr-row.later .tr-rep {
+  color: var(--faint);
+}
+.tr-row.later .tr-side,
+.tr-row.later.side-1 .tr-side {
+  background: var(--faint);
 }
 .tr-fn {
   overflow: hidden;

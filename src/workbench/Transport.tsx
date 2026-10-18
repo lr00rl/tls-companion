@@ -111,6 +111,9 @@ function Scrubber({ cursor }: { cursor: number }) {
   const step = useWB((s) => s.step);
   const [box, size] = useSize<HTMLDivElement>();
   const dragging = useRef(false);
+  // Focus that came from a click or drag leaves the arrow keys to the
+  // workbench, which steps; Tab focus scrubs event by event.
+  const byPointer = useRef(false);
   const n = model.last + 1;
   const x = (ev: number) => (ev / Math.max(1, n - 1)) * size.w;
   const evAt = (clientX: number) => {
@@ -147,6 +150,7 @@ function Scrubber({ cursor }: { cursor: number }) {
       aria-valuetext={`第 ${cursor} 个事件，步骤 ${step + 1}`}
       onPointerDown={(e) => {
         e.currentTarget.setPointerCapture(e.pointerId);
+        byPointer.current = true;
         dragging.current = true;
         useWB.getState().setScrubbing(true);
         useWB.getState().setPlaying(false);
@@ -161,7 +165,11 @@ function Scrubber({ cursor }: { cursor: number }) {
         dragging.current = false;
         useWB.getState().setScrubbing(false);
       }}
+      onBlur={() => {
+        byPointer.current = false;
+      }}
       onKeyDown={(e) => {
+        if (byPointer.current) return;
         let to: number;
         if (e.key === "Home") to = 0;
         else if (e.key === "End") to = n - 1;

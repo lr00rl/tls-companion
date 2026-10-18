@@ -164,22 +164,28 @@ export function Palette({ onClose }: { onClose: () => void }) {
         { group: "常用", title: "T06 TLS 1.3 握手与密钥调度逐包拆解", key: "", go: () => (onClose(), navigate({ page: "notes", id: "T06" })) },
       ] as Item[];
     }
-    const scored: [number, Item][] = [];
+    let scored: [number, Item, boolean][] = [];
     for (const it of items) {
       let s = score(query, it.key, !!it.fuzzy);
       if (s < 0 && it.body && query.length >= 2 && it.body.includes(query)) s = 120;
-      if (s >= 0) scored.push([s, it]);
+      if (s >= 0) scored.push([s, it, it.key.includes(query) || !!it.body?.includes(query)]);
     }
+    // Scattered-letter matches only fill in when nothing contains the query:
+    // "T06" should open the T06 note, not a cipher suite constant.
+    if (scored.some(([, , sub]) => sub)) scored = scored.filter(([, , sub]) => sub);
     scored.sort((a, b) => b[0] - a[0]);
     const per = new Map<string, number>();
+    const best = new Map<string, number>();
     const out: Item[] = [];
-    for (const [, it] of scored) {
+    for (const [s, it] of scored) {
       const n = per.get(it.group) ?? 0;
       if (n >= 7) continue;
       per.set(it.group, n + 1);
+      if (!best.has(it.group)) best.set(it.group, s);
       out.push(it);
     }
-    return out.sort((a, b) => groupOrder.indexOf(a.group) - groupOrder.indexOf(b.group));
+    // Groups appear in order of their best match; the fixed order breaks ties.
+    return out.sort((a, b) => best.get(b.group)! - best.get(a.group)! || groupOrder.indexOf(a.group) - groupOrder.indexOf(b.group));
   }, [q, items, onClose]);
 
   useEffect(() => setSel(0), [q]);

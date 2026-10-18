@@ -26,6 +26,8 @@ interface Marker {
   label: string;
   /** Position among labels at the same side and instant. */
   row: number;
+  /** The event that derived the key: until the cursor reaches it, the marker is in the future. */
+  ev: number;
 }
 
 function layout(model: Model, tcp: boolean) {
@@ -61,7 +63,7 @@ function layout(model: Model, tcp: boolean) {
     // the handshake and application keys from one arriving flight), so labels
     // at the same spot stack instead of printing over each other.
     const row = markers.filter((m) => m.side === s.side && Math.abs(m.t - t) < 0.08).length;
-    markers.push({ side: s.side, t, epoch: ep, label, row });
+    markers.push({ side: s.side, t, epoch: ep, label, row, ev: s.ev });
   }
   const tMax = Math.max(...flights.map((f) => f.tArrive), model.time[model.last] + off) + 0.15;
   const maxBytes = Math.max(...flights.map((f) => f.bytes), 400);
@@ -71,6 +73,10 @@ function layout(model: Model, tcp: boolean) {
 export function Stage({ tcp }: { tcp: boolean }) {
   const model = useWB((s) => s.model);
   const cursor = useWB((s) => s.cursor);
+  // A key the current step derives counts as present for the whole step, so a
+  // reader on "server derives the handshake keys" sees it appear.
+  const stepEnd = useWB((s) => s.steps[s.step]?.end ?? s.cursor);
+  const keyFuture = (ev: number) => ev > Math.max(cursor, stepEnd);
   const sel = useWB((s) => s.sel);
   const scrubbing = useWB((s) => s.scrubbing);
   const speed = useWB((s) => s.speed);
@@ -100,9 +106,12 @@ export function Stage({ tcp }: { tcp: boolean }) {
     const el = scroller.current;
     if (!el || !lay || height <= el.clientHeight) return;
     const cy = y(t);
-    let newest: VFlight | undefined;
-    for (const f of lay.flights) if (!f.tcp && f.tSend < t) newest = f;
-    const want = newest ? Math.min(cy - 40, (y(newest.tSend) + y(newest.tArrive)) / 2 - 64) : cy - 40;
+    // The newest packet drawn: its labels can wrap to several rows, so its
+    // top is measured rather than estimated.
+    const packets = el.querySelectorAll<HTMLElement>(".packet:not(.future)");
+    const newest = packets[packets.length - 1];
+    const labelTop = newest ? newest.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop : Infinity;
+    const want = Math.min(cy - 40, labelTop - 8);
     const bottom = cy + 60;
     if (want >= el.scrollTop && bottom <= el.scrollTop + el.clientHeight) return;
     el.scrollTop = bottom - want <= el.clientHeight ? want - 8 : cy - el.clientHeight * 0.4;
@@ -164,7 +173,7 @@ export function Stage({ tcp }: { tcp: boolean }) {
               );
             })}
             {lay.markers.map((m) => (
-              <g key={`${m.side}${m.epoch}`} className={`marker ep${t + 1e-6 < m.t ? " future" : ""}`} data-ep={m.epoch}>
+              <g key={`${m.side}${m.epoch}`} className={`marker ep${keyFuture(m.ev) ? " future" : ""}`} data-ep={m.epoch}>
                 <rect x={(m.side === 0 ? xC : xS) - 5} y={y(m.t) - 5} width={10} height={10} transform={`rotate(45 ${m.side === 0 ? xC : xS} ${y(m.t)})`} />
               </g>
             ))}
@@ -190,7 +199,7 @@ export function Stage({ tcp }: { tcp: boolean }) {
           {lay.markers.map((m) => (
             <div
               key={`l${m.side}${m.epoch}`}
-              className={`marker-label ep${m.side === 1 ? " right" : ""}${t + 1e-6 < m.t ? " future" : ""}`}
+              className={`marker-label ep${m.side === 1 ? " right" : ""}${keyFuture(m.ev) ? " future" : ""}`}
               data-ep={m.epoch}
               style={{ left: m.side === 0 ? xC : xS, top: y(m.t) + m.row * 17 }}
             >

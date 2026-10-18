@@ -14,7 +14,6 @@
 .rtt select {
   height: 28px;
   max-width: 220px;
-  field-sizing: content;
   padding: 0 24px 0 8px;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
@@ -23,8 +22,10 @@
   font-weight: 600;
   cursor: pointer;
 }
+/* A fixed width, so switching scenarios never moves the play button. */
 .scenario-pick select {
-  max-width: 300px;
+  width: 232px;
+  max-width: none;
 }
 .rtt {
   display: flex;
@@ -164,7 +165,7 @@
 }
 @media (max-width: 600px) {
   .scenario-pick select {
-    max-width: 150px;
+    width: 146px;
   }
   .step-title .step-name {
     display: none;

@@ -298,8 +298,10 @@ export function CodeView({ target, symbols, goVersion, onNavigate, onRfc, exec, 
       <div
         className="code-scroll"
         ref={scroller}
-        tabIndex={prepared ? 0 : undefined}
-        role={prepared ? "region" : undefined}
+        // Keyed on the target, not the loaded file: dropping tabIndex while
+        // the next file loads would blur it and hand the arrows to the workbench.
+        tabIndex={target ? 0 : undefined}
+        role={target ? "region" : undefined}
         aria-label={target ? `${target.file.split("/").pop()} 源码：上下键换行，左右键选标识符，回车跳转` : undefined}
         onFocus={(e) => {
           if (e.target === e.currentTarget && e.currentTarget.matches(":focus-visible")) setKb((k) => k ?? { line: caret ?? 1, tok: 0 });

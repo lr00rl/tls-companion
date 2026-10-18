@@ -35,8 +35,18 @@ export function figureLines(lines: string[]): Set<number> {
     }
     let j = i;
     let hits = 0;
-    for (; j < lines.length && lines[j].trim(); j++) if (looks(lines[j])) hits++;
-    if (hits / (j - i) >= 0.4) for (let k = i; k < j; k++) out.add(k);
+    let braces = false;
+    let decls = 0;
+    for (; j < lines.length && lines[j].trim(); j++) {
+      const t = lines[j].trim();
+      if (looks(lines[j])) hits++;
+      // Presentation-language structs and enums: an opening "{" line or a
+      // closing "}" line, or a run of declarations that all end in ";".
+      if (t.endsWith("{") || t.startsWith("}")) braces = true;
+      if (t.endsWith(";")) decls++;
+    }
+    const n = j - i;
+    if (braces || decls === n || hits / n >= 0.4) for (let k = i; k < j; k++) out.add(k);
     i = j;
   }
   return out;
@@ -130,11 +140,16 @@ export function RfcText({ doc, section, window: win, onSection, bundled }: Props
       const text = doc.lines
         .slice(i, j)
         .map((l) => l.trim())
-        .reduce((acc, l) => (/[a-z]-$/.test(acc) && /^[a-z]/.test(l) ? acc + l : `${acc} ${l}`));
-      // Keep the RFC's indentation, with a hanging indent for list items.
+        // RFCs break lines only at existing hyphens ("Diffie-\n Hellman"), so a
+        // line-end hyphen joins the next line without a space.
+        .reduce((acc, l) => (/[A-Za-z0-9]-$/.test(acc) ? acc + l : `${acc} ${l}`));
+      // Keep the RFC's indentation. Wrapped lines take the indent of the
+      // paragraph's second line, which gives list items and "name:  text"
+      // definitions their hanging indent; a one-line item hangs past its marker.
       const marker = /^(-|o|\*|\d+\.)\s+/.exec(text)?.[0].length ?? 0;
+      const cont = j > i + 1 ? indent(doc.lines[i + 1]) : indent(line) + marker;
       rows.push(
-        <div key={i} data-l={i} className="rfc-line rfc-para" style={{ paddingLeft: `${indent(line) + marker}ch`, textIndent: `${-marker}ch` }}>
+        <div key={i} data-l={i} className="rfc-line rfc-para" style={{ paddingLeft: `${cont}ch`, textIndent: `${indent(line) - cont}ch` }}>
           {linkify(text, doc.n, onSection, bundled)}
         </div>,
       );

@@ -312,8 +312,9 @@
 .krow.now > .k-line {
   background: var(--accent-wash);
 }
-.krow.future > .k-line {
-  opacity: 0.5;
+.krow.future > .k-line,
+.krow.future > .k-line * {
+  color: var(--faint);
 }
 .k-main {
   flex: 1;

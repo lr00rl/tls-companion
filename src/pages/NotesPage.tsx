@@ -279,4 +279,12 @@ async function drawMermaid(root: HTMLElement) {
   } catch (e) {
     console.warn("[tls-companion] mermaid", e);
   }
+  // On a phone, 65% of natural size keeps labels near 10px while showing
+  // more of the diagram than full size would.
+  if (!fit)
+    for (const n of nodes) {
+      const svg = n.querySelector("svg");
+      const w = svg?.width.baseVal.value;
+      if (svg && w) svg.style.width = `${Math.round(w * 0.65)}px`;
+    }
 }

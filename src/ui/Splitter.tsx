@@ -15,6 +15,8 @@ interface Props {
 /** A drag handle that tracks the pointer 1:1 from where it was grabbed. */
 export function Splitter({ axis, value, min, max, dir = 1, onChange, label }: Props) {
   const start = useRef<{ p: number; v: number } | null>(null);
+  // A splitter grabbed with the mouse keeps focus; only Tab focus resizes by key.
+  const byPointer = useRef(false);
   const clamp = (v: number) => Math.max(min, Math.min(max, v));
   // The layout can swap this handle out mid-drag (crossing the mobile
   // breakpoint), which leaves no pointerup to clear the body cursor.
@@ -36,6 +38,7 @@ export function Splitter({ axis, value, min, max, dir = 1, onChange, label }: Pr
       tabIndex={0}
       onPointerDown={(e) => {
         e.currentTarget.setPointerCapture(e.pointerId);
+        byPointer.current = true;
         start.current = { p: axis === "x" ? e.clientX : e.clientY, v: value };
         document.body.classList.add(`resizing-${axis}`);
       }}
@@ -52,7 +55,11 @@ export function Splitter({ axis, value, min, max, dir = 1, onChange, label }: Pr
         start.current = null;
         document.body.classList.remove("resizing-x", "resizing-y");
       }}
+      onBlur={() => {
+        byPointer.current = false;
+      }}
       onKeyDown={(e) => {
+        if (byPointer.current) return;
         const step = e.shiftKey ? 48 : 16;
         const k = e.key;
         const grow = axis === "x" ? (k === "ArrowRight" ? 1 : k === "ArrowLeft" ? -1 : 0) : k === "ArrowDown" ? 1 : k === "ArrowUp" ? -1 : 0;
