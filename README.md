@@ -18,6 +18,8 @@ The **history** (`#/history`) lays protocol versions, attacks, and Go releases s
 
 The **RFC reader** (`#/rfc`) has 40 RFCs as unpaginated text with cross-links, and lists the Go comments that cite each section.
 
+Everything works from the keyboard. `/` or Cmd-K searches steps, Go symbols, files, notes, and RFC sections, and treats `key_share`, `keyShare`, and "key share" as the same query. In the workbench, Left and Right change step, Space plays, and the timeline takes the arrow keys, Shift with an arrow for larger jumps, Home, and End. The field tree and the call trace are each one tab stop that the arrow keys move through. Tabbing into the code puts a cursor on the current line: Up and Down move it, Left and Right pick an identifier, and Enter follows it. Every view is a link, and workbench links count steps from 1, so `#/play/tls13-full/8` opens step 8.
+
 ## How the data is made
 
 Everything under `public/data/` is generated, and CI regenerates it on every push.
