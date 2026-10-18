@@ -3,7 +3,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { RfcDoc } from "../src/data/types";
-import { refsIn } from "../src/rfc/RfcText";
+import { figureLines, refsIn } from "../src/rfc/RfcText";
 
 const pick = (line: string, self = 8446) => refsIn(line, self).map(({ text, n, sec }) => ({ text, n, sec }));
 
@@ -35,5 +35,28 @@ describe("refsIn", () => {
       expect(m, l).toBeDefined();
       expect(m!.n, l).not.toBe(8446);
     }
+  });
+});
+
+// On narrow screens prose wraps and figures keep their columns, so the
+// handshake diagram in RFC 8446 section 2 must be kept whole, and the
+// paragraphs around it must wrap.
+describe("figureLines", () => {
+  const doc = JSON.parse(readFileSync(new URL("../public/data/rfc/rfc8446.json", import.meta.url), "utf8")) as RfcDoc;
+  const fig = figureLines(doc.lines);
+  const at = (text: string, from = 0) => doc.lines.findIndex((l, i) => i >= from && l.includes(text));
+  const s2 = doc.sections.find((s) => s.id === "2")!.line;
+
+  it("keeps every line of the full handshake diagram", () => {
+    const first = at("Client                                           Server", s2);
+    const last = at("[Application Data]      <------->  [Application Data]", s2);
+    expect(first).toBeGreaterThan(0);
+    expect(last).toBeGreaterThan(first);
+    for (let i = first; i <= last; i++) if (doc.lines[i].trim()) expect(fig.has(i), doc.lines[i]).toBe(true);
+  });
+
+  it("lets prose wrap, including a paragraph with a stray '--'", () => {
+    expect(fig.has(at("Figure 1 below shows the basic full TLS handshake:", s2))).toBe(false);
+    expect(fig.has(at("is reduced -- as, for"))).toBe(false);
   });
 });

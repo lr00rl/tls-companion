@@ -4,6 +4,7 @@ const T = "crypto/tls.";
 
 export const tls12Ecdhe: ScenarioDef = {
   id: "tls12-ecdhe",
+  short: "TLS 1.2 ECDHE",
   tcp: true,
   intro:
     "客户端把 `MaxVersion` 设为 TLS 1.2，只提供 `TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256` 一个套件和 X25519 一个组；服务器是默认配置，本可以说 TLS 1.3。TLS 1.2 要先协商好参数才能交换密钥，客户端发出请求之前需要 2 个往返，再加上 TCP 一共 3 个。",
@@ -138,6 +139,7 @@ export const tls12Ecdhe: ScenarioDef = {
 
 export const tls12Rsa: ScenarioDef = {
   id: "tls12-rsa",
+  short: "TLS 1.2 RSA",
   tcp: true,
   intro:
     "`TLS_RSA_WITH_AES_128_GCM_SHA256`：没有 ServerKeyExchange，客户端直接用证书里的 RSA 公钥加密一个随机的预主密钥发给服务器。这条路在 TLS 1.3 里被整个删掉，Go 1.22 起也不在默认列表里，这里显式配置才能用上。看它是为了看清什么叫没有前向保密。",

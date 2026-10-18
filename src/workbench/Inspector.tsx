@@ -5,6 +5,7 @@ import { dissect, dissectRecordPlain, type Field } from "../capture/dissect";
 import { hexBytes, messageName, recordLabel, wrapEpoch, type Model } from "../capture/model";
 import { contentTypes } from "../capture/names";
 import type { InspectorTab } from "../scenarios/types";
+import { useTreeNav, type TreeRow } from "../ui/tree";
 import { useFieldSites } from "./fieldSites";
 import { HexView } from "./HexView";
 import { KeySchedule } from "./KeySchedule";
@@ -100,8 +101,39 @@ function FieldsTab({ model }: { model: Model }) {
   }, [view, fieldKey]);
 
   const selPath = sel?.kind === "msg" ? sel.field : undefined;
+  const selKey = selPath?.join("/");
   const selected = selPath && view ? findPath(view.fields, selPath) : undefined;
   const sites = useFieldSites(selected?.go, symbols);
+
+  // The visible rows in order, shared by rendering and the keyboard model.
+  const flat: (TreeRow & { f: Field; path: string[] })[] = [];
+  const walk = (fs: Field[], path: string[], level: number) => {
+    fs.forEach((f, i) => {
+      const p = [...path, String(i)];
+      const key = p.join("/");
+      const isOpen = open.has(key);
+      flat.push({ key, level, expandable: !!f.children, open: isOpen, f, path: p });
+      if (f.children && isOpen) walk(f.children, p, level + 1);
+    });
+  };
+  if (view) walk(view.fields, [], 1);
+
+  const toggle = (key: string) => {
+    const n = new Set(open);
+    if (n.has(key)) n.delete(key);
+    else n.add(key);
+    setOpen(n);
+  };
+  const choose = (f: Field, path: string[]) => {
+    useWB.getState().selectField(path, undefined, [f.start, f.end]);
+  };
+  const nav = useTreeNav(flat, selKey, {
+    toggle,
+    activate: (key) => {
+      const r = flat.find((x) => x.key === key);
+      if (r) choose(r.f, r.path);
+    },
+  });
 
   if (!view)
     return (
@@ -111,52 +143,41 @@ function FieldsTab({ model }: { model: Model }) {
       </div>
     );
 
-  const choose = (f: Field, path: string[]) => {
-    useWB.getState().selectField(path, undefined, [f.start, f.end]);
-  };
-
-  const rows: React.ReactNode[] = [];
-  const walk = (fs: Field[], path: string[], depth: number) => {
-    for (let i = 0; i < fs.length; i++) {
-      const f = fs[i];
-      const p = [...path, String(i)];
-      const key = p.join("/");
-      const isOpen = open.has(key);
-      const isSel = selPath && key === selPath.join("/");
-      const inHover = hover && f.start <= hover[0] && hover[1] <= f.end && !f.len;
-      rows.push(
-        <div
-          key={key + f.start}
-          className={`ft-row${isSel ? " sel" : ""}${f.len ? " len" : ""}${inHover && !isSel ? " hov" : ""}`}
-          style={{ paddingLeft: 8 + depth * 14 }}
-          onClick={() => choose(f, p)}
-          onPointerEnter={() => useWB.getState().setHover([f.start, f.end])}
-        >
-          {f.children ? (
-            <button
-              className={`ft-tw${isOpen ? " open" : ""}`}
-              aria-label={isOpen ? "折叠" : "展开"}
-              aria-expanded={isOpen}
-              onClick={(e) => {
-                e.stopPropagation();
-                const n = new Set(open);
-                if (isOpen) n.delete(key);
-                else n.add(key);
-                setOpen(n);
-              }}
-            />
-          ) : (
-            <span className="ft-tw none" />
-          )}
-          <span className="ft-name mono">{f.name}</span>
-          {f.value && <span className="ft-val">{f.value}</span>}
-          <span className="ft-size num">{f.end - f.start}</span>
-        </div>,
-      );
-      if (f.children && isOpen) walk(f.children, p, depth + 1);
-    }
-  };
-  walk(view.fields, [], 0);
+  const rows = flat.map(({ key, level, f, path, open: isOpen }) => {
+    const isSel = key === selKey;
+    const inHover = hover && f.start <= hover[0] && hover[1] <= f.end && !f.len;
+    return (
+      <div
+        key={key + f.start}
+        role="treeitem"
+        aria-level={level}
+        aria-expanded={f.children ? isOpen : undefined}
+        aria-selected={isSel}
+        {...nav.rowProps(key)}
+        className={`ft-row${isSel ? " sel" : ""}${f.len ? " len" : ""}${inHover && !isSel ? " hov" : ""}`}
+        style={{ paddingLeft: 8 + (level - 1) * 14 }}
+        onClick={() => choose(f, path)}
+        onPointerEnter={() => useWB.getState().setHover([f.start, f.end])}
+      >
+        {f.children ? (
+          <button
+            className={`ft-tw${isOpen ? " open" : ""}`}
+            tabIndex={-1}
+            aria-hidden
+            onClick={(e) => {
+              e.stopPropagation();
+              toggle(key);
+            }}
+          />
+        ) : (
+          <span className="ft-tw none" />
+        )}
+        <span className="ft-name mono">{f.name}</span>
+        {f.value && <span className="ft-val">{f.value}</span>}
+        <span className="ft-size num">{f.end - f.start}</span>
+      </div>
+    );
+  });
 
   return (
     <div className="fields-tab">
@@ -167,7 +188,13 @@ function FieldsTab({ model }: { model: Model }) {
         <span className="muted">{view.epoch === "plaintext" ? "明文" : `解密自 ${view.epoch}`}</span>
       </div>
       <div className="ft-split">
-        <div className="field-tree" onPointerLeave={() => useWB.getState().setHover(selected ? [selected.start, selected.end] : null)}>
+        <div
+          className="field-tree"
+          role="tree"
+          aria-label={`${view.title} 的字段`}
+          onKeyDown={nav.onKeyDown}
+          onPointerLeave={() => useWB.getState().setHover(selected ? [selected.start, selected.end] : null)}
+        >
           {rows}
         </div>
         <HexView

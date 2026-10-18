@@ -1,5 +1,6 @@
 import { useLayoutEffect, useMemo, useRef, type ReactNode } from "react";
 import type { RfcDoc } from "../data/types";
+import { useMedia } from "../ui/hooks";
 
 interface Props {
   doc: RfcDoc;
@@ -15,6 +16,31 @@ interface Props {
 // A bare "Section N" points into the document being read.
 const ref =
   /RFC ?(?<rfc>\d{3,5})(?:,? (?:Section|§) ?(?<rsec>\d+(?:\.\d+)*|[A-Z](?:\.\d+)*))?|(?:Section|Appendix) (?<sec>\d+(?:\.\d+)*|[A-Z](?:\.\d+)*)(?: of (?:\[RFC(?<of>\d{3,5})\]|RFC ?(?<of2>\d{3,5})))?|\[RFC(?<br>\d{3,5})\]/g;
+
+/**
+ * Lines that belong to ASCII figures and tables, which keep their columns on
+ * narrow screens while prose wraps. A single line is a weak signal (box
+ * edges, arrows, rules, deep indentation, or a gap of three or more spaces
+ * between words, where prose uses at most two), so whole blank-separated
+ * blocks are judged: a block is a figure when at least 40% of its lines look
+ * like one. A stray "--" in a paragraph then leaves the paragraph wrapping.
+ */
+export function figureLines(lines: string[]): Set<number> {
+  const looks = (l: string) => /[|+]-|-[->+|]|<-|={3}|\S {3,}\S|^\s*[|+]|^ {10,}\S| [|^] /.test(l);
+  const out = new Set<number>();
+  for (let i = 0; i < lines.length; ) {
+    if (!lines[i].trim()) {
+      i++;
+      continue;
+    }
+    let j = i;
+    let hits = 0;
+    for (; j < lines.length && lines[j].trim(); j++) if (looks(lines[j])) hits++;
+    if (hits / (j - i) >= 0.4) for (let k = i; k < j; k++) out.add(k);
+    i = j;
+  }
+  return out;
+}
 
 export interface RefMatch {
   index: number;
@@ -56,13 +82,67 @@ export function RfcText({ doc, section, window: win, onSection, bundled }: Props
   }, [start, win, doc]);
 
   const sectionLines = useMemo(() => new Map(doc.sections.map((s) => [s.line, s])), [doc]);
+  const figures = useMemo(() => figureLines(doc.lines), [doc]);
+  const narrow = useMedia("(max-width: 700px)");
 
   const rows: ReactNode[] = [];
   for (let i = from; i < end; i++) {
     const line = doc.lines[i];
     const sec = sectionLines.get(i);
+    // On a narrow screen a paragraph hard-wrapped at 72 columns is joined
+    // back into one block, so it wraps once instead of alternating long and
+    // short lines. Headings and figures keep their lines.
+    if (narrow && figures.has(i)) {
+      // One horizontal scroller per figure, blank lines inside it included,
+      // so panning a diagram leaves the prose around it in place.
+      let j = i + 1;
+      for (;;) {
+        let k = j;
+        while (k < end && !doc.lines[k].trim()) k++;
+        if (k < end && figures.has(k)) j = k + 1;
+        else break;
+      }
+      rows.push(
+        <div key={i} data-l={i} className="rfc-fig">
+          {doc.lines.slice(i, j).map((l, k) => (
+            <div key={k} className="rfc-line fig">
+              {linkify(l, doc.n, onSection, bundled)}
+            </div>
+          ))}
+        </div>,
+      );
+      i = j - 1;
+      continue;
+    }
+    if (narrow && line.trim() && !sec) {
+      const indent = (l: string) => l.length - l.trimStart().length;
+      const item = (l: string) => /^\s*(-|o|\*|\d+\.)\s/.test(l);
+      let j = i + 1;
+      while (
+        j < end &&
+        doc.lines[j].trim() &&
+        !sectionLines.has(j) &&
+        !figures.has(j) &&
+        !item(doc.lines[j]) &&
+        !(item(line) && indent(doc.lines[j]) <= indent(line))
+      )
+        j++;
+      const text = doc.lines
+        .slice(i, j)
+        .map((l) => l.trim())
+        .reduce((acc, l) => (/[a-z]-$/.test(acc) && /^[a-z]/.test(l) ? acc + l : `${acc} ${l}`));
+      // Keep the RFC's indentation, with a hanging indent for list items.
+      const marker = /^(-|o|\*|\d+\.)\s+/.exec(text)?.[0].length ?? 0;
+      rows.push(
+        <div key={i} data-l={i} className="rfc-line rfc-para" style={{ paddingLeft: `${indent(line) + marker}ch`, textIndent: `${-marker}ch` }}>
+          {linkify(text, doc.n, onSection, bundled)}
+        </div>,
+      );
+      i = j - 1;
+      continue;
+    }
     rows.push(
-      <div key={i} data-l={i} className={`rfc-line${sec ? " rfc-h" : ""}${sec && sec.id === section ? " target" : ""}`} id={sec ? `s-${sec.id}` : undefined}>
+      <div key={i} data-l={i} className={`rfc-line${sec ? " rfc-h" : ""}${sec && sec.id === section ? " target" : ""}${figures.has(i) ? " fig" : ""}`} id={sec ? `s-${sec.id}` : undefined}>
         {linkify(line, doc.n, onSection, bundled)}
       </div>,
     );

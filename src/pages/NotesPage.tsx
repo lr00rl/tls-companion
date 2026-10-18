@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { href } from "../app/route";
 import { usePeek } from "../app/peek";
-import { load, useLoad } from "../data/load";
+import { load, NotFoundError, useLoad } from "../data/load";
 import type { Note } from "../data/types";
 import { scenarioDefs } from "../scenarios";
 import { useMedia } from "../ui/hooks";
@@ -155,12 +155,21 @@ export default function NotesPage({ id, anchor }: { id?: string; anchor?: string
           </div>
         )}
         {note.state === "loading" && <div className="loading-bar" />}
-        {note.state === "error" && (
-          <div className="empty">
-            <strong>笔记加载失败</strong>
-            {note.error.message}
-          </div>
-        )}
+        {note.state === "error" &&
+          (note.error instanceof NotFoundError ? (
+            <div className="empty">
+              <strong>没有编号为 {noteId} 的笔记</strong>
+              <a href={href({ page: "notes" })}>回到总览与学习路线</a>
+            </div>
+          ) : (
+            <div className="empty">
+              <strong>笔记加载失败</strong>
+              {note.error.message}{" "}
+              <button className="btn outline" onClick={note.retry}>
+                重试
+              </button>
+            </div>
+          ))}
         {note.state === "ready" && (
           <article className="note">
             <header>
@@ -254,13 +263,16 @@ async function drawMermaid(root: HTMLElement) {
     (!document.documentElement.dataset.theme && window.matchMedia("(prefers-color-scheme: dark)").matches);
   mermaidReady ??= import("mermaid").then((m) => m.default);
   const mermaid = await mermaidReady;
+  // Fitting a 1000px sequence diagram into a phone shrinks its labels to a
+  // few pixels, so narrow screens draw at natural size and scroll the figure.
+  const fit = !window.matchMedia("(max-width: 700px)").matches;
   mermaid.initialize({
     startOnLoad: false,
     securityLevel: "strict",
     theme: dark ? "dark" : "neutral",
     fontFamily: getComputedStyle(document.body).fontFamily,
-    sequence: { useMaxWidth: true },
-    flowchart: { useMaxWidth: true },
+    sequence: { useMaxWidth: fit },
+    flowchart: { useMaxWidth: fit },
   });
   try {
     await mermaid.run({ nodes });

@@ -7,6 +7,8 @@ export interface Step extends StepDef {
   start: number;
   end: number;
   msgIndex: number;
+  /** For a record step without a message: the first record its side sends during the step. */
+  recIndex: number;
 }
 
 export function findMessage(cap: Capture, sel: MsgSel): number {
@@ -61,10 +63,18 @@ export function resolveSteps(model: Model, def: ScenarioDef): Resolved {
     if (start < from) errors.push(`${def.id}/${s.id}: starts at ${start}, before the previous step (${from})`);
     const msgIndex = s.msg ? findMessage(model.cap, s.msg) : -1;
     if (s.msg && msgIndex < 0) errors.push(`${def.id}/${s.id}: message ${JSON.stringify(s.msg)} not in capture`);
-    steps.push({ ...s, index, start, end: model.last, msgIndex });
+    steps.push({ ...s, index, start, end: model.last, msgIndex, recIndex: -1 });
     from = start;
   });
   for (let i = 0; i + 1 < steps.length; i++) steps[i].end = Math.max(steps[i].start, steps[i + 1].start - 1);
+  // A record step anchors where the write begins, before the record exists, so
+  // its record is found by write time rather than by what is already on the wire.
+  for (const st of steps) {
+    if (st.tab !== "record" || st.msgIndex >= 0) continue;
+    const { records, writes } = model.cap;
+    st.recIndex = records.findIndex((r) => r.dir === st.side && writes[r.write].ev >= st.start && writes[r.write].ev <= st.end);
+    if (st.recIndex < 0) errors.push(`${def.id}/${st.id}: no record sent by side ${st.side} during the step`);
+  }
   return { steps, errors };
 }
 

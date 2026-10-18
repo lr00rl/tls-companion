@@ -12,6 +12,16 @@ export function useMedia(query: string): boolean {
   return on;
 }
 
+export function useViewportHeight(): number {
+  const [h, setH] = useState(() => window.innerHeight);
+  useEffect(() => {
+    const f = () => setH(window.innerHeight);
+    window.addEventListener("resize", f);
+    return () => window.removeEventListener("resize", f);
+  }, []);
+  return h;
+}
+
 function read<T>(key: string, fallback: T): T {
   try {
     const v = localStorage.getItem(`tlsc.${key}`);

@@ -5,6 +5,7 @@ const K = "crypto/internal/fips140/tls13.";
 
 export const tls13Resume: ScenarioDef = {
   id: "tls13-resume",
+  short: "TLS 1.3 恢复",
   tcp: true,
   intro:
     "采集程序先跑一条完整握手（没有录下来），客户端从中收到 NewSessionTicket 存进 `ClientSessionCache`；录下来的是第二条连接。客户端用票据里的 PSK 恢复会话，模式是 psk_dhe_ke：仍然做一次密钥交换以保持前向保密，但服务器不再发送证书，也不再签名。",

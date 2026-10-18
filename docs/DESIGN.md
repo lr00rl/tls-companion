@@ -47,11 +47,18 @@ spacing, and motion values.
 | panel | `oklch(.972 .005 240)` | `oklch(.195 .012 255)` |
 | line | `oklch(.905 .008 240)` | `oklch(.29 .012 255)` |
 | ink | `oklch(.24 .02 255)` | `oklch(.93 .008 255)` |
+| muted (secondary text) | `oklch(.48 .015 255)` | `oklch(.72 .012 255)` |
+| faint (offsets, counts, line numbers) | `oklch(.53 .012 255)` | `oklch(.62 .012 255)` |
 | accent (selection, focus, playhead) | `oklch(.50 .17 258)` | `oklch(.72 .13 258)` |
-| plaintext epoch | `oklch(.60 .01 250)` | `oklch(.68 .01 250)` |
-| early-data epoch | `oklch(.68 .15 70)` | `oklch(.78 .12 70)` |
-| handshake epoch | `oklch(.56 .17 350)` | `oklch(.74 .12 350)` |
-| application epoch | `oklch(.56 .13 155)` | `oklch(.74 .11 155)` |
+| plaintext epoch | `oklch(.53 .01 250)` | `oklch(.68 .01 250)` |
+| early-data epoch | `oklch(.55 .13 70)` | `oklch(.78 .12 70)` |
+| handshake epoch | `oklch(.53 .17 350)` | `oklch(.74 .12 350)` |
+| application epoch | `oklch(.50 .13 155)` | `oklch(.74 .11 155)` |
+
+Every text token, the epoch colors included because packet labels use them,
+holds 4.5:1 against paper, panel, and well in both themes. Faint is therefore
+only a little lighter than muted; size and weight carry the rest of the
+hierarchy.
 
 Type: the system sans stack (PingFang SC on Apple, Microsoft YaHei on Windows)
 carries UI and prose because it sets Chinese and Latin together correctly.

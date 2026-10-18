@@ -14,6 +14,7 @@
 .rtt select {
   height: 28px;
   max-width: 220px;
+  field-sizing: content;
   padding: 0 24px 0 8px;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
@@ -21,6 +22,9 @@
   font-size: var(--fs-13);
   font-weight: 600;
   cursor: pointer;
+}
+.scenario-pick select {
+  max-width: 300px;
 }
 .rtt {
   display: flex;
@@ -79,7 +83,7 @@
 
 .scrubber {
   position: relative;
-  height: 28px;
+  height: 34px;
   margin-top: 6px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -128,17 +132,30 @@
   box-shadow: 0 0 0 2px var(--paper);
   pointer-events: none;
 }
+/* Lane names sit in a gutter left of the track, each level with its lane
+   (client runs at y 8 to 16, server at 20 to 28). */
+.scrub-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.scrub-row .scrubber {
+  flex: 1;
+  min-width: 0;
+  margin-top: 0;
+}
 .scrub-legend {
-  position: absolute;
-  right: 4px;
-  top: 2px;
+  flex: none;
   display: flex;
   flex-direction: column;
-  font-size: 8.5px;
-  line-height: 11px;
-  color: var(--faint);
-  pointer-events: none;
+  justify-content: center;
+  gap: 0;
+  height: 36px;
+  font-size: 10px;
+  line-height: 12px;
+  color: var(--muted);
   text-align: right;
+  white-space: nowrap;
 }
 @media (max-width: 1100px) {
   .hide-md {

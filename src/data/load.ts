@@ -19,10 +19,16 @@ const base = `${import.meta.env.BASE_URL}data/`;
 const cache = new Map<string, Promise<unknown>>();
 const settled = new Map<string, unknown>();
 
+/** The requested data does not exist, as opposed to a load that failed and may succeed on retry. */
+export class NotFoundError extends Error {}
+
 function fetchJSON<T>(path: string): Promise<T> {
   let p = cache.get(path) as Promise<T> | undefined;
   if (!p) {
     p = fetch(base + path).then(async (r) => {
+      // GitHub Pages answers a missing file with 404; the Vite dev server
+      // answers it with index.html.
+      if (r.status === 404 || (r.ok && !r.headers.get("content-type")?.includes("json"))) throw new NotFoundError(`${path} 不存在`);
       if (!r.ok) throw new Error(`${path}: HTTP ${r.status}`);
       const v = (await r.json()) as T;
       settled.set(path, v);

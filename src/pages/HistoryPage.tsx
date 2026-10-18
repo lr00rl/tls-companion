@@ -23,9 +23,11 @@ export default function HistoryPage({ entry }: { entry?: string }) {
     void useWB.getState().ensureSymbols();
   }, []);
 
+  // On narrow screens the detail opens inline below the entry, so the entry
+  // goes to the top to leave the detail room below it.
   useEffect(() => {
-    document.querySelector(".entry.on")?.scrollIntoView({ block: "nearest" });
-  }, [entry]);
+    document.querySelector(".entry.on")?.scrollIntoView({ block: wide ? "nearest" : "start" });
+  }, [entry, wide]);
 
   const years = useMemo(() => {
     const m = new Map<string, Entry[]>();

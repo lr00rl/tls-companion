@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { CodeTarget } from "../app/store";
-import { load, useLoad, type SymbolIndex } from "../data/load";
+import { href } from "../app/route";
+import { load, NotFoundError, useLoad, type SymbolIndex } from "../data/load";
 import type { CodeFile } from "../data/types";
 import {
   DEF_BIT,
@@ -91,6 +92,28 @@ export function CodeView({ target, symbols, goVersion, onNavigate, onRfc, exec, 
 
   useEffect(() => setRefsFor(null), [target?.file]);
 
+  // Keyboard cursor: a line, and which linked identifier on it. It turns on
+  // only when focus arrives by keyboard, so a click into the code leaves the
+  // arrow keys to the workbench and text selection to the mouse.
+  const [kb, setKb] = useState<{ line: number; tok: number } | null>(null);
+  useEffect(() => setKb((k) => (k && caret ? { line: caret, tok: 0 } : k)), [caret, target]);
+  const lineLinks = (ln: number): { r: number; def: boolean }[] => {
+    if (!prepared || !data) return [];
+    const out: { r: number; def: boolean }[] = [];
+    for (let t = prepared.tokIdx[ln - 1]; t < prepared.tokIdx[ln]; t += 4) {
+      if (data.tokens[t + 3] >= 0) out.push({ r: data.tokens[t + 3], def: !!(data.tokens[t + 2] & DEF_BIT) });
+    }
+    return out;
+  };
+
+  useLayoutEffect(() => {
+    const el = scroller.current;
+    if (!el || !kb) return;
+    const y = (kb.line - 1) * LINE;
+    if (y < el.scrollTop) el.scrollTop = y;
+    else if (y + LINE > el.scrollTop + el.clientHeight) el.scrollTop = y + LINE - el.clientHeight;
+  }, [kb]);
+
   const execLines = target ? exec?.lines.get(target.file) : undefined;
   const execCur = exec?.current && target && exec.current.file === target.file ? exec.current.line : undefined;
 
@@ -127,6 +150,49 @@ export function CodeView({ target, symbols, goVersion, onNavigate, onRfc, exec, 
     if (res) activate(res, el.dataset.def === "1");
   };
 
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (!kb || !prepared) return;
+    const total = prepared.lines.length;
+    const page = Math.max(1, Math.floor(scroll.height / LINE) - 2);
+    const links = lineLinks(kb.line);
+    let { line, tok } = kb;
+    switch (e.key) {
+      case "ArrowDown":
+        line = Math.min(total, line + 1);
+        tok = 0;
+        break;
+      case "ArrowUp":
+        line = Math.max(1, line - 1);
+        tok = 0;
+        break;
+      case "PageDown":
+        line = Math.min(total, line + page);
+        tok = 0;
+        break;
+      case "PageUp":
+        line = Math.max(1, line - page);
+        tok = 0;
+        break;
+      case "ArrowRight":
+        tok = Math.min(Math.max(0, links.length - 1), tok + 1);
+        break;
+      case "ArrowLeft":
+        tok = Math.max(0, tok - 1);
+        break;
+      case "Enter": {
+        const l = links[tok];
+        const res = l && resolve(l.r);
+        if (res) activate(res, l.def);
+        break;
+      }
+      default:
+        return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    setKb({ line, tok });
+  };
+
   const onOver = (e: React.PointerEvent) => {
     if (e.pointerType !== "mouse") return;
     const el = (e.target as HTMLElement).closest<HTMLElement>("[data-r]");
@@ -158,13 +224,16 @@ export function CodeView({ target, symbols, goVersion, onNavigate, onRfc, exec, 
       const ls = prepared.starts[l];
       const parts: ReactNode[] = [];
       let pos = 0;
+      let link = 0;
       for (let t = prepared.tokIdx[l]; t < prepared.tokIdx[l + 1]; t += 4) {
         const s = data.tokens[t] - ls;
         const n = data.tokens[t + 1];
         const k = data.tokens[t + 2];
         const r = data.tokens[t + 3];
         if (s > pos) parts.push(text.slice(pos, s));
-        const cls = KIND_CLASS[k & 31] + (k & DEF_BIT ? " def" : "") + (r >= 0 ? " link" : "");
+        const kf = r >= 0 && kb?.line === ln && link === kb.tok;
+        if (r >= 0) link++;
+        const cls = KIND_CLASS[k & 31] + (k & DEF_BIT ? " def" : "") + (r >= 0 ? " link" : "") + (kf ? " kfocus" : "");
         parts.push(
           <span key={t} className={cls} data-r={r >= 0 ? r : undefined} data-def={k & DEF_BIT ? "1" : undefined}>
             {text.slice(s, s + n)}
@@ -178,7 +247,7 @@ export function CodeView({ target, symbols, goVersion, onNavigate, onRfc, exec, 
       rows.push(
         <div
           key={ln}
-          className={`row${inRange ? " in-range" : ""}${ln === caret ? " caret" : ""}${ln === execCur ? " exec" : ""}`}
+          className={`row${inRange ? " in-range" : ""}${ln === caret ? " caret" : ""}${ln === execCur ? " exec" : ""}${ln === kb?.line ? " kcur" : ""}`}
           style={{ top: l * LINE }}
         >
           <span className="gutter">
@@ -229,6 +298,16 @@ export function CodeView({ target, symbols, goVersion, onNavigate, onRfc, exec, 
       <div
         className="code-scroll"
         ref={scroller}
+        tabIndex={prepared ? 0 : undefined}
+        role={prepared ? "region" : undefined}
+        aria-label={target ? `${target.file.split("/").pop()} 源码：上下键换行，左右键选标识符，回车跳转` : undefined}
+        onFocus={(e) => {
+          if (e.target === e.currentTarget && e.currentTarget.matches(":focus-visible")) setKb((k) => k ?? { line: caret ?? 1, tok: 0 });
+        }}
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setKb(null);
+        }}
+        onKeyDown={onKeyDown}
         onScroll={(e) => setScroll({ top: e.currentTarget.scrollTop, height: e.currentTarget.clientHeight })}
         onClick={onClick}
         onPointerOver={onOver}
@@ -239,15 +318,21 @@ export function CodeView({ target, symbols, goVersion, onNavigate, onRfc, exec, 
       >
         {!target && (empty ?? <div className="empty">选择一个步骤、字段或调用来打开代码。</div>)}
         {target && file.state === "loading" && <div className="loading-bar" />}
-        {file.state === "error" && (
-          <div className="empty">
-            <strong>源码加载失败</strong>
-            {file.error.message}{" "}
-            <button className="btn outline" onClick={file.retry}>
-              重试
-            </button>
-          </div>
-        )}
+        {file.state === "error" &&
+          (file.error instanceof NotFoundError ? (
+            <div className="empty">
+              <strong>{target?.file} 不在索引里</strong>
+              这里只收录 crypto/tls 和它的密码学依赖。<a href={href({ page: "code" })}>回到源码目录</a>
+            </div>
+          ) : (
+            <div className="empty">
+              <strong>源码加载失败</strong>
+              {file.error.message}{" "}
+              <button className="btn outline" onClick={file.retry}>
+                重试
+              </button>
+            </div>
+          ))}
         {prepared && (
           <div className="code-canvas" style={{ height: total * LINE }}>
             {rows}

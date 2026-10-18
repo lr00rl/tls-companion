@@ -12,21 +12,36 @@ interface Item {
   group: string;
   title: string;
   sub?: string;
-  /** Text the query is matched against, lowercased. */
+  /** Text the query is matched against, passed through norm(). */
   key: string;
   /** Secondary text matched with a lower weight (note bodies). */
   body?: string;
+  /** Identifiers (symbols, paths) also match a scattered subsequence. */
+  fuzzy?: boolean;
   go: () => void;
 }
 
 const groupOrder = ["步骤", "符号", "文件", "笔记", "RFC", "演进"];
 
-/** Substring beats subsequence; earlier and shorter matches rank higher. */
-function score(q: string, key: string): number {
+/**
+ * The wire name key_share, the Go name keyShare, and the RFC title "Key Share"
+ * should all find each other, so case, underscores, hyphens, and spaces are
+ * dropped on both sides before matching.
+ */
+function norm(s: string): string {
+  return s.toLowerCase().replace(/[\s_-]+/g, "");
+}
+
+/**
+ * Substring beats subsequence; earlier and shorter matches rank higher. Only
+ * identifiers take subsequence matches: in prose they mostly find letters
+ * scattered across unrelated words.
+ */
+function score(q: string, key: string, fuzzy: boolean): number {
   const i = key.indexOf(q);
   if (i === 0) return 1000 - key.length;
   if (i > 0) return 700 - i - key.length * 0.1;
-  if (!/^[\x20-\x7e]+$/.test(q)) return -1;
+  if (!fuzzy || !/^[\x20-\x7e]+$/.test(q)) return -1;
   let k = 0;
   let gaps = 0;
   for (const ch of q) {
@@ -52,7 +67,14 @@ export function Palette({ onClose }: { onClose: () => void }) {
   );
   const inWorkbench = parse(location.hash).page === "play";
 
-  useEffect(() => input.current?.focus(), []);
+  // Closing hands focus back to whatever opened the palette, if it still exists.
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    input.current?.focus();
+    return () => {
+      if (opener && opener !== document.body && opener.isConnected) opener.focus({ preventScroll: true });
+    };
+  }, []);
 
   const items = useMemo(() => {
     const out: Item[] = [];
@@ -66,7 +88,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
           group: "步骤",
           title: s.title,
           sub: d.id,
-          key: `${s.title} ${s.id}`.toLowerCase(),
+          key: norm(`${s.title} ${s.id}`),
           go: close(() => navigate({ page: "play", scenario: d.id, step: i })),
         }),
       );
@@ -77,7 +99,8 @@ export function Palette({ onClose }: { onClose: () => void }) {
           group: "符号",
           title: symDisplay(s),
           sub: `${kindName[s.t] ?? ""} · ${s.f}:${s.l}`,
-          key: `${s.n} ${symDisplay(s)}`.toLowerCase(),
+          key: norm(`${s.n} ${symDisplay(s)}`),
+          fuzzy: true,
           go: close(() =>
             inWorkbench
               ? useWB.getState().openCode({ file: s.f, line: s.l, range: [s.l, s.e ?? s.l], reason: `搜索：${symDisplay(s)}` }, { push: true })
@@ -92,13 +115,14 @@ export function Palette({ onClose }: { onClose: () => void }) {
             group: "文件",
             title: f.p.split("/").pop()!,
             sub: f.p,
-            key: f.p.toLowerCase(),
+            key: norm(f.p),
+            fuzzy: true,
             go: close(() => (inWorkbench ? useWB.getState().openCode({ file: f.p, line: 1 }, { push: true }) : navigate({ page: "code", path: f.p }))),
           });
     if (noteIndex.state === "ready") {
       const bodies = new Map(notes.state === "ready" ? notes.data.map((n) => [n.id, n]) : []);
       for (const n of noteIndex.data) {
-        out.push({ group: "笔记", title: n.title, key: n.title.toLowerCase(), go: close(() => navigate({ page: "notes", id: n.id })) });
+        out.push({ group: "笔记", title: n.title, key: norm(n.title), go: close(() => navigate({ page: "notes", id: n.id })) });
         const full = bodies.get(n.id);
         for (const h of n.headings) {
           const sec = full?.search.find((x) => x.anchor === h.anchor);
@@ -106,8 +130,8 @@ export function Palette({ onClose }: { onClose: () => void }) {
             group: "笔记",
             title: h.text,
             sub: n.title,
-            key: h.text.toLowerCase(),
-            body: sec?.text.toLowerCase(),
+            key: norm(h.text),
+            body: sec ? norm(sec.text) : undefined,
             go: close(() => navigate({ page: "notes", id: n.id, anchor: h.anchor })),
           });
         }
@@ -115,23 +139,23 @@ export function Palette({ onClose }: { onClose: () => void }) {
     }
     if (rfcs.state === "ready")
       for (const d of rfcs.data) {
-        out.push({ group: "RFC", title: `RFC ${d.n}`, sub: d.title, key: `rfc ${d.n} rfc${d.n} ${d.title}`.toLowerCase(), go: close(() => navigate({ page: "rfc", n: d.n })) });
+        out.push({ group: "RFC", title: `RFC ${d.n}`, sub: d.title, key: norm(`rfc ${d.n} rfc${d.n} ${d.title}`), go: close(() => navigate({ page: "rfc", n: d.n })) });
         for (const s of d.sections)
           out.push({
             group: "RFC",
             title: `${d.n} §${s.id} ${s.title}`,
             sub: d.title,
-            key: `${d.n} ${s.id} ${s.title}`.toLowerCase(),
+            key: norm(`${d.n} ${s.id} ${s.title}`),
             go: close(() => (inWorkbench ? usePeek.getState().open(d.n, s.id) : navigate({ page: "rfc", n: d.n, section: s.id }))),
           });
       }
     for (const e of entries)
-      out.push({ group: "演进", title: e.title, sub: e.date, key: `${e.title} ${e.id}`.toLowerCase(), go: close(() => navigate({ page: "history", entry: e.id })) });
+      out.push({ group: "演进", title: e.title, sub: e.date, key: norm(`${e.title} ${e.id}`), go: close(() => navigate({ page: "history", entry: e.id })) });
     return out;
   }, [symbols, meta, rfcs, noteIndex, notes, inWorkbench, onClose]);
 
   const results = useMemo(() => {
-    const query = q.trim().toLowerCase();
+    const query = norm(q);
     if (!query) {
       return [
         { group: "常用", title: "回放 TLS 1.3 完整握手", key: "", go: () => (onClose(), navigate({ page: "play", scenario: "tls13-full", step: 0 })) },
@@ -142,7 +166,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
     }
     const scored: [number, Item][] = [];
     for (const it of items) {
-      let s = score(query, it.key);
+      let s = score(query, it.key, !!it.fuzzy);
       if (s < 0 && it.body && query.length >= 2 && it.body.includes(query)) s = 120;
       if (s >= 0) scored.push([s, it]);
     }
@@ -166,7 +190,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
   const loading = symbols.state === "loading" || noteIndex.state === "loading";
   return (
     <div className="pal-scrim" onClick={onClose}>
-      <div className="palette" role="dialog" aria-label="搜索" onClick={(e) => e.stopPropagation()}>
+      <div className="palette" role="dialog" aria-modal="true" aria-label="搜索" onClick={(e) => e.stopPropagation()}>
         <div className="pal-input">
           <svg viewBox="0 0 16 16" aria-hidden>
             <circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.5" />

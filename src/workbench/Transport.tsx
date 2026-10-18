@@ -4,6 +4,7 @@ import { useLoad, load } from "../data/load";
 import { EV_WRITE } from "../data/types";
 import { scenarioDefs } from "../scenarios";
 import { navigate } from "../app/route";
+import { useMedia } from "../ui/hooks";
 import { useSize } from "./clock";
 import "./transport.css";
 
@@ -26,6 +27,8 @@ export function Transport() {
   const wb = useWB.getState;
   const index = useLoad("captures", load.captures);
   const titles = new Map(index.state === "ready" ? index.data.map((c) => [c.id, c.title]) : []);
+  // Full names do not fit beside the controls on a phone.
+  const narrow = useMedia("(max-width: 600px)");
 
   const cur = steps[step];
   return (
@@ -39,7 +42,7 @@ export function Transport() {
           >
             {scenarioDefs.map((d) => (
               <option key={d.id} value={d.id}>
-                {titles.get(d.id) ?? d.id}
+                {narrow ? d.short : (titles.get(d.id) ?? d.id)}
               </option>
             ))}
           </select>
@@ -89,7 +92,15 @@ export function Transport() {
           </select>
         </label>
       </div>
-      {model && <Scrubber cursor={cursor} />}
+      {model && (
+        <div className="scrub-row">
+          <div className="scrub-legend" aria-hidden>
+            <span className="c">客户端</span>
+            <span className="s">服务器</span>
+          </div>
+          <Scrubber cursor={cursor} />
+        </div>
+      )}
     </div>
   );
 }
@@ -151,32 +162,34 @@ function Scrubber({ cursor }: { cursor: number }) {
         useWB.getState().setScrubbing(false);
       }}
       onKeyDown={(e) => {
-        const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
-        if (!d) return;
+        let to: number;
+        if (e.key === "Home") to = 0;
+        else if (e.key === "End") to = n - 1;
+        else {
+          const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+          if (!d) return;
+          to = cursor + d * (e.shiftKey ? 25 : 1);
+        }
         e.preventDefault();
         e.stopPropagation();
-        set(cursor + d * (e.shiftKey ? 25 : 1));
+        set(Math.max(0, Math.min(n - 1, to)));
       }}
     >
-      <svg width={size.w} height={28} aria-hidden>
+      <svg width={size.w} height={34} aria-hidden>
         {steps.map((s, i) => (
-          <rect key={s.id} x={x(s.start)} width={Math.max(1, x(s.end + 1) - x(s.start))} y={0} height={28} className={`seg-bg${i === step ? " cur" : i % 2 ? " odd" : ""}`} />
+          <rect key={s.id} x={x(s.start)} width={Math.max(1, x(s.end + 1) - x(s.start))} y={0} height={34} className={`seg-bg${i === step ? " cur" : i % 2 ? " odd" : ""}`} />
         ))}
         {runs.map((r) => (
-          <rect key={r.a} x={x(r.a)} width={Math.max(1, x(r.b + 1) - x(r.a))} y={r.side === 0 ? 6 : 15} height={7} className={`run side-${r.side}`} />
+          <rect key={r.a} x={x(r.a)} width={Math.max(1, x(r.b + 1) - x(r.a))} y={r.side === 0 ? 8 : 20} height={8} className={`run side-${r.side}`} />
         ))}
         {writes.map((ev) => (
-          <line key={ev} x1={x(ev)} x2={x(ev)} y1={2} y2={26} className="write-tick" />
+          <line key={ev} x1={x(ev)} x2={x(ev)} y1={2} y2={32} className="write-tick" />
         ))}
         {steps.map((s) => (
-          <line key={s.id} x1={x(s.start)} x2={x(s.start)} y1={0} y2={28} className="step-edge" />
+          <line key={s.id} x1={x(s.start)} x2={x(s.start)} y1={0} y2={34} className="step-edge" />
         ))}
       </svg>
       <div className="playhead" style={{ transform: `translateX(${x(cursor)}px)` }} />
-      <div className="scrub-legend">
-        <span className="c">客户端</span>
-        <span className="s">服务器</span>
-      </div>
     </div>
   );
 }

@@ -82,7 +82,7 @@
   margin: 4px 0 8px;
   color: var(--syn-func);
   font-size: var(--fs-12);
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .run-item {
   display: block;
@@ -113,6 +113,11 @@
   line-height: 20px;
   white-space: nowrap;
   overflow: hidden;
+}
+.ol-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .ol-item:hover {
   background: var(--hover);
@@ -214,6 +219,18 @@
   gap: 4px 12px;
   font-size: var(--fs-12);
   color: var(--muted);
+}
+.rfc-meta select {
+  flex: 1 1 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 32px;
+  font: inherit;
+}
+@media (max-width: 700px) {
+  .rfc-main .rfc-text {
+    font-size: 11px;
+  }
 }
 .rfc-main .rfc-text {
   font-size: 13px;

@@ -55,6 +55,8 @@ export interface StepDef {
 
 export interface ScenarioDef {
   id: string;
+  /** A name that fits the transport bar on a phone. */
+  short: string;
   /** One paragraph shown above the steps. */
   intro: string;
   /** Whether a TCP handshake is drawn before the first record. */

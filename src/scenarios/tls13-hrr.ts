@@ -4,6 +4,7 @@ const T = "crypto/tls.";
 
 export const tls13Hrr: ScenarioDef = {
   id: "tls13-hrr",
+  short: "TLS 1.3 HRR",
   tcp: true,
   intro:
     "服务器的 `CurvePreferences` 只有 P-256，而客户端照默认配置只为 X25519MLKEM768 和 X25519 准备了份额。客户端在 supported_groups 里列出了 P-256，所以握手不会失败，但服务器必须用 HelloRetryRequest 请它重来一次，整个握手因此多花 1 个往返。",

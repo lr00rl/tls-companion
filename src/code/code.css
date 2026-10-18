@@ -333,3 +333,18 @@
     display: none;
   }
 }
+
+/* Keyboard cursor: shown only while the code has keyboard focus. */
+.code-scroll:focus-visible {
+  outline-offset: -2px;
+}
+.code-scroll:focus-visible .row.kcur {
+  box-shadow: inset 3px 0 0 var(--accent);
+  background: var(--hover);
+}
+.code-scroll:focus-visible .src .kfocus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: 2px;
+  background: var(--accent-wash);
+}

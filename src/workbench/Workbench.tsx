@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
-import { navigate } from "../app/route";
+import { useEffect, useRef, useState } from "react";
+import { href, navigate } from "../app/route";
 import { useWB, type MobilePane } from "../app/store";
-import { defaultScenario, scenarioById } from "../scenarios";
+import { defaultScenario, scenarioById, scenarioDefs } from "../scenarios";
+import { load, useLoad } from "../data/load";
+import type { ScenarioDef } from "../scenarios/types";
 import { Splitter } from "../ui/Splitter";
-import { useMedia, usePref } from "../ui/hooks";
+import { useMedia, usePref, useViewportHeight } from "../ui/hooks";
 import { CodePanel } from "./CodePanel";
 import { Inspector } from "./Inspector";
 import { Stage } from "./Stage";
@@ -21,13 +23,18 @@ export function Workbench({ scenario, step }: { scenario?: string; step?: number
   const wide = useMedia("(min-width: 1280px)");
   const mobile = useMedia("(max-width: 899px)");
 
+  const unknown = !!scenario && !scenarioById.has(scenario);
+
   useEffect(() => {
+    if (unknown) return;
     if (!scenario) navigate({ page: "play", scenario: id, step: 0 }, { replace: true });
     void useWB.getState().open(id, step);
-  }, [id, step, scenario]);
+  }, [id, step, scenario, unknown]);
 
   usePlayback();
   useKeys();
+
+  if (unknown) return <UnknownScenario name={scenario!} />;
 
   if (loadError)
     return (
@@ -56,10 +63,17 @@ function DesktopLayout({ tcp, wide, defId }: { tcp: boolean; wide: boolean; defI
   const [right, setRight] = usePref("wb.right", 620);
   const [stageH, setStageH] = usePref("wb.stage", 400);
   const [traceH, setTraceH] = usePref("wb.trace", 260);
+  const [cardOpen, setCardOpen] = usePref("wb.card", true);
   const [drawer, setDrawer] = useState(false);
   const step = useWB((s) => s.step);
   const steps = useWB((s) => s.steps);
   const def = scenarioById.get(defId)!;
+  // The stored stage height is a preference; the window caps it so the
+  // inspector below always keeps room (about 470px for the top bar, the
+  // transport, and the inspector, plus the step card when the rail is folded).
+  const vh = useViewportHeight();
+  const stageMax = Math.max(220, vh - 470 - (wide ? 0 : cardOpen ? 150 : 40));
+  const stageShown = Math.min(stageH, stageMax);
 
   return (
     <div className="wb-body">
@@ -79,14 +93,22 @@ function DesktopLayout({ tcp, wide, defId }: { tcp: boolean; wide: boolean; defI
                 全部步骤
               </button>
               <strong>{steps[step]?.title}</strong>
+              <span className="spacer" />
+              <button className="btn" onClick={() => setCardOpen(!cardOpen)} aria-expanded={cardOpen} aria-controls="step-card-body">
+                {cardOpen ? "收起说明" : "展开说明"}
+              </button>
             </div>
-            <StepBody index={step} />
+            {cardOpen && (
+              <div id="step-card-body">
+                <StepBody index={step} />
+              </div>
+            )}
           </div>
         )}
-        <div className="wb-stage" style={{ height: stageH }}>
+        <div className="wb-stage" style={{ height: stageShown }}>
           <Stage tcp={tcp} />
         </div>
-        <Splitter axis="y" value={stageH} min={220} max={760} onChange={setStageH} label="调整时序图高度" />
+        <Splitter axis="y" value={stageShown} min={220} max={stageMax} onChange={setStageH} label="调整时序图高度" />
         <div className="wb-inspector">
           <Inspector />
         </div>
@@ -101,13 +123,7 @@ function DesktopLayout({ tcp, wide, defId }: { tcp: boolean; wide: boolean; defI
           <TracePanel />
         </div>
       </div>
-      {!wide && drawer && (
-        <div className="drawer-scrim" onClick={() => setDrawer(false)}>
-          <aside className="drawer" onClick={(e) => e.stopPropagation()} aria-label="步骤列表">
-            <StepRail def={def} />
-          </aside>
-        </div>
-      )}
+      {!wide && drawer && <StepDrawer def={def} onClose={() => setDrawer(false)} />}
     </div>
   );
 }
@@ -118,6 +134,56 @@ const panes: [MobilePane, string][] = [
   ["code", "源码"],
   ["trace", "调用"],
 ];
+
+function UnknownScenario({ name }: { name: string }) {
+  const index = useLoad("captures", load.captures);
+  const title = (id: string) => (index.state === "ready" ? index.data.find((c) => c.id === id)?.title : undefined) ?? id;
+  return (
+    <div className="empty wb-error">
+      <strong>没有名为 {name} 的场景</strong>
+      录下来的连接有：
+      <ul>
+        {scenarioDefs.map((d) => (
+          <li key={d.id}>
+            <a href={href({ page: "play", scenario: d.id, step: 0 })}>{title(d.id)}</a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** The step list as a drawer when the rail is folded: focus moves in, Escape closes, focus goes back. */
+function StepDrawer({ def, onClose }: { def: ScenarioDef; onClose: () => void }) {
+  const panel = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    panel.current?.focus();
+    return () => {
+      if (opener?.isConnected) opener.focus({ preventScroll: true });
+    };
+  }, []);
+  return (
+    <div className="drawer-scrim" onClick={onClose}>
+      <aside
+        ref={panel}
+        className="drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-label="步骤列表"
+        tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => {
+          if (e.key !== "Escape") return;
+          e.stopPropagation();
+          onClose();
+        }}
+      >
+        <StepRail def={def} />
+      </aside>
+    </div>
+  );
+}
 
 function MobileLayout({ tcp }: { tcp: boolean }) {
   const pane = useWB((s) => s.pane);
@@ -165,7 +231,7 @@ function useKeys() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
-      if (t.closest("input, textarea, select, [role=slider], [role=separator], [contenteditable]") || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (t.closest("input, textarea, select, [role=slider], [role=separator], [role=tree], [contenteditable]") || e.metaKey || e.ctrlKey || e.altKey) return;
       const wb = useWB.getState();
       if (e.key === "ArrowRight") {
         e.preventDefault();

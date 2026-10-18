@@ -172,6 +172,14 @@
   max-width: 100%;
   height: auto;
 }
+@media (max-width: 700px) {
+  .note-body pre.mermaid {
+    text-align: left;
+  }
+  .note-body pre.mermaid svg {
+    max-width: none;
+  }
+}
 .note-body blockquote {
   margin: 1em 0;
   padding: 4px 16px;

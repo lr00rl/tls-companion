@@ -3,6 +3,28 @@
   flex-direction: column;
   height: 100%;
 }
+/* Focus targets for page changes and the skip link, not controls. */
+.app:focus,
+.main:focus {
+  outline: none;
+}
+.skip-link {
+  position: fixed;
+  top: 6px;
+  left: 6px;
+  z-index: 100;
+  padding: 6px 12px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--accent);
+  font: inherit;
+  font-size: var(--fs-13);
+  transform: translateY(-200%);
+}
+.skip-link:focus-visible {
+  transform: none;
+}
 .topbar {
   display: flex;
   align-items: center;

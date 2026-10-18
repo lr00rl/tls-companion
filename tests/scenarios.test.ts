@@ -36,6 +36,17 @@ for (const def of scenarioDefs) {
       expect(steps).toHaveLength(def.steps.length);
     });
 
+    // A record step must show the record it sends, not the one before it:
+    // application data for the app steps, an alert for close_notify.
+    for (const st of steps.filter((x) => x.recIndex >= 0)) {
+      it(`${st.id}: selects the record its own side sends`, () => {
+        const r = cap.records[st.recIndex];
+        expect(r.dir).toBe(st.side);
+        expect(r.inner).toBe(st.id === "close" ? 21 : 23);
+        expect(cap.writes[r.write].ev).toBeGreaterThanOrEqual(st.start);
+      });
+    }
+
     for (const s of def.steps) {
       it(`${s.id}: code, refs, and markup resolve`, () => {
         if (s.code) {

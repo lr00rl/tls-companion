@@ -5,6 +5,7 @@ const K = "crypto/internal/fips140/tls13.";
 
 export const tls13Full: ScenarioDef = {
   id: "tls13-full",
+  short: "TLS 1.3 完整",
   tcp: true,
   intro:
     "Go 1.26 的客户端和服务器都用默认配置，只加了证书和 ALPN。默认的第一选择是 X25519MLKEM768 混合密钥交换，所以这条连接的 ClientHello 有 1.5 KB，放不进一个 TCP 段。握手 1 个往返完成，随后是一次 HTTP/1.1 请求和响应，最后双方互发 close_notify。",

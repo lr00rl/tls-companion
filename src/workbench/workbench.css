@@ -85,9 +85,13 @@
 .splitter-y::after {
   inset: -4px 0;
 }
-.splitter:hover,
-.splitter:focus-visible {
+.splitter:hover {
   background: var(--accent-line);
+}
+/* A 1px rule cannot carry an outline, so focus widens it into a 5px accent bar. */
+.splitter:focus-visible {
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
   outline: none;
 }
 body.resizing-x,
@@ -233,7 +237,7 @@ body.resizing-y * {
 
 .step-card {
   flex: none;
-  max-height: 34vh;
+  max-height: 22vh;
   overflow-y: auto;
   border-bottom: 1px solid var(--line);
   background: var(--panel);
@@ -267,6 +271,9 @@ body.resizing-y * {
   background: var(--panel);
   box-shadow: var(--shadow-pop);
   animation: drawer-in 180ms var(--ease-out);
+}
+.drawer:focus {
+  outline: none;
 }
 @keyframes drawer-in {
   from {

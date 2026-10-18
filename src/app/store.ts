@@ -53,8 +53,8 @@ interface WorkbenchState {
   open(scenario: string, step?: number): Promise<void>;
   goStep(i: number, opts?: { keepUrl?: boolean }): void;
   setCursor(ev: number, opts?: { follow?: boolean }): void;
-  selectMessage(index: number, opts?: { moveCursor?: boolean }): void;
-  selectRecord(index: number, opts?: { moveCursor?: boolean }): void;
+  selectMessage(index: number): void;
+  selectRecord(index: number): void;
   selectField(path: string[] | undefined, go?: string, range?: [number, number]): void;
   setHover(r: [number, number] | null): void;
   setTab(t: InspectorTab): void;
@@ -76,6 +76,18 @@ function symTarget(ix: SymbolIndex, key: string, find?: string, reason?: string)
   if (!s || s.x) return null;
   return { file: s.f, line: s.l, range: [s.l, s.e ?? s.l], find, reason };
 }
+
+/** What a step selects in the inspector, whether reached by stepping or scrubbing. */
+function stepSelection(s: Step, tab: InspectorTab): Pick<WorkbenchState, "sel" | "tab" | "keySide" | "hover"> {
+  return {
+    sel: s.msgIndex >= 0 ? { kind: "msg", index: s.msgIndex } : s.recIndex >= 0 ? { kind: "rec", index: s.recIndex } : null,
+    tab: s.tab ?? (s.msgIndex >= 0 ? "fields" : tab),
+    keySide: s.side === 1 ? 1 : 0,
+    hover: null,
+  };
+}
+
+let scrubStartStep = -1;
 
 /** The line executing at an event: the call site of the latest call entered. */
 export function executingAt(model: Model, ev: number): Call | null {
@@ -152,16 +164,7 @@ export const useWB = create<WorkbenchState>((set, get) => ({
     const s = steps[i];
     if (!s) return;
     const code = s.code && symbols ? symTarget(symbols, s.code.fn, s.code.find, s.title) : get().code;
-    set({
-      step: i,
-      cursor: s.start,
-      sel: s.msgIndex >= 0 ? { kind: "msg", index: s.msgIndex } : null,
-      tab: s.tab ?? (s.msgIndex >= 0 ? "fields" : get().tab),
-      keySide: s.side === 1 ? 1 : 0,
-      code,
-      hover: null,
-      traceSel: null,
-    });
+    set({ step: i, cursor: s.start, ...stepSelection(s, get().tab), code, traceSel: null });
     if (!opts?.keepUrl && scenario) navigate({ page: "play", scenario, step: i }, { replace: true });
   },
 
@@ -198,14 +201,13 @@ export const useWB = create<WorkbenchState>((set, get) => ({
     set(patch);
   },
 
-  selectMessage(index, opts) {
+  selectMessage(index) {
     const { model } = get();
     if (!model) return;
     set({ sel: { kind: "msg", index }, tab: "fields", hover: null });
-    if (opts?.moveCursor) get().setCursor(model.messageWriteEv[index]);
   },
 
-  selectRecord(index, opts) {
+  selectRecord(index) {
     const { model } = get();
     if (!model) return;
     const msgs = model.recordMessages[index];
@@ -214,7 +216,6 @@ export const useWB = create<WorkbenchState>((set, get) => ({
     } else {
       set({ sel: { kind: "rec", index }, tab: "record", hover: null });
     }
-    if (opts?.moveCursor) get().setCursor(model.cap.writes[model.cap.records[index].write].ev);
   },
 
   selectField(path, go, range) {
@@ -281,6 +282,11 @@ export const useWB = create<WorkbenchState>((set, get) => ({
     set({ pane });
   },
   setScrubbing(scrubbing) {
-    set({ scrubbing });
+    const { step, steps, tab } = get();
+    if (scrubbing) scrubStartStep = step;
+    // Landing on another step by scrubbing shows what stepping there would,
+    // while a scrub inside one step keeps the reader's own selection.
+    const landed = !scrubbing && step !== scrubStartStep && steps[step];
+    set(landed ? { scrubbing, ...stepSelection(steps[step], tab) } : { scrubbing });
   },
 }));

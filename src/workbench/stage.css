@@ -102,6 +102,9 @@
   font-size: 10.5px;
   font-weight: 600;
   color: var(--c);
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--paper);
   white-space: nowrap;
   pointer-events: none;
 }
@@ -138,7 +141,7 @@
   padding: 0 3px;
   border: 0;
   border-radius: 3px;
-  background: transparent;
+  background: var(--paper);
   color: var(--c);
   font-family: var(--font-mono);
   font-size: 11px;
@@ -192,6 +195,9 @@
 .packet-bytes {
   font-size: 10px;
   color: var(--muted);
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--paper);
 }
 .packet.flying .bar {
   box-shadow: 0 0 0 3px var(--w);
@@ -204,6 +210,9 @@
   font-size: 11px;
   color: var(--ink-2);
   white-space: nowrap;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--paper);
 }
 .tcp-label span {
   color: var(--faint);
@@ -268,4 +277,12 @@
   border-top: 2px dashed var(--c);
   height: 0;
   vertical-align: 3px;
+}
+
+/* Packet labels sit side by side; on touch screens each gets a taller target. */
+@media (pointer: coarse) {
+  .plabel {
+    padding: 0 6px;
+    line-height: 24px;
+  }
 }

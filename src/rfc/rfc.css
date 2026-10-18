@@ -75,4 +75,19 @@
     font-size: 11px;
     padding: 10px 10px 32px;
   }
+  /* Prose wraps to the screen; figures keep the RFC's own columns and scroll
+     inside the text box. */
+  .rfc-line {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .rfc-line.fig {
+    white-space: pre;
+    overflow-wrap: normal;
+  }
+  .rfc-fig {
+    overflow-x: auto;
+    margin: 0 -10px;
+    padding: 0 10px;
+  }
 }

@@ -451,3 +451,9 @@
 .mono.wrap {
   overflow-wrap: anywhere;
 }
+
+/* Tree rows are keyboard stops; the ring sits inside the scrolling list. */
+.ft-row:focus-visible,
+.tr-row:focus-visible {
+  outline-offset: -2px;
+}

@@ -24,6 +24,8 @@ interface Marker {
   t: number;
   epoch: Epoch;
   label: string;
+  /** Position among labels at the same side and instant. */
+  row: number;
 }
 
 function layout(model: Model, tcp: boolean) {
@@ -54,7 +56,12 @@ function layout(model: Model, tcp: boolean) {
     else if (s.op === "PRF" && s.label === "key expansion") [ep, label] = ["app", "会话密钥"];
     if (!ep || seen.has(`${s.side}${ep}`)) continue;
     seen.add(`${s.side}${ep}`);
-    markers.push({ side: s.side, t: model.time[s.ev] + off, epoch: ep, label });
+    const t = model.time[s.ev] + off;
+    // A side can switch epochs twice at one network instant (the client takes
+    // the handshake and application keys from one arriving flight), so labels
+    // at the same spot stack instead of printing over each other.
+    const row = markers.filter((m) => m.side === s.side && Math.abs(m.t - t) < 0.08).length;
+    markers.push({ side: s.side, t, epoch: ep, label, row });
   }
   const tMax = Math.max(...flights.map((f) => f.tArrive), model.time[model.last] + off) + 0.15;
   const maxBytes = Math.max(...flights.map((f) => f.bytes), 400);
@@ -86,12 +93,19 @@ export function Stage({ tcp }: { tcp: boolean }) {
   const height = lay ? y(lay.tMax) + 12 : size.h;
   const bytePx = lay ? Math.min(0.42, (xS - xC - 24) / Math.max(lay.maxBytes, MSS * 1.15)) : 0.2;
 
-  // Keep the cursor line in view when the diagram is taller than the panel.
+  // Keep the cursor line in view when the diagram is taller than the panel,
+  // together with the labels of the newest packet sent (they sit at the
+  // flight's midpoint, above the line) whenever both fit.
   useEffect(() => {
     const el = scroller.current;
-    if (!el || height <= el.clientHeight) return;
+    if (!el || !lay || height <= el.clientHeight) return;
     const cy = y(t);
-    if (cy < el.scrollTop + 40 || cy > el.scrollTop + el.clientHeight - 60) el.scrollTop = cy - el.clientHeight * 0.4;
+    let newest: VFlight | undefined;
+    for (const f of lay.flights) if (!f.tcp && f.tSend < t) newest = f;
+    const want = newest ? Math.min(cy - 40, (y(newest.tSend) + y(newest.tArrive)) / 2 - 64) : cy - 40;
+    const bottom = cy + 60;
+    if (want >= el.scrollTop && bottom <= el.scrollTop + el.clientHeight) return;
+    el.scrollTop = bottom - want <= el.clientHeight ? want - 8 : cy - el.clientHeight * 0.4;
   });
 
   if (!model || !lay) return <div ref={box} className="stage" />;
@@ -178,7 +192,7 @@ export function Stage({ tcp }: { tcp: boolean }) {
               key={`l${m.side}${m.epoch}`}
               className={`marker-label ep${m.side === 1 ? " right" : ""}${t + 1e-6 < m.t ? " future" : ""}`}
               data-ep={m.epoch}
-              style={{ left: m.side === 0 ? xC : xS, top: y(m.t) }}
+              style={{ left: m.side === 0 ? xC : xS, top: y(m.t) + m.row * 17 }}
             >
               {m.label}
             </div>
@@ -207,7 +221,7 @@ export function Stage({ tcp }: { tcp: boolean }) {
                       key={ri}
                       className={`plabel ep${selectedRecords.has(ri) ? " sel" : ""}`}
                       data-ep={model.recordEpoch[ri]}
-                      onClick={() => selectRecord(ri, { moveCursor: true })}
+                      onClick={() => selectRecord(ri)}
                       title={`${labels[k]} · 记录 ${model.cap.records[ri].len + 5} 字节`}
                     >
                       {narrow ? labels[k].replace("EncryptedExtensions", "EE").replace("CertificateVerify", "CV").replace("NewSessionTicket", "NST").replace("ChangeCipherSpec", "CCS") : labels[k].replace("ChangeCipherSpec", "CCS")}
@@ -221,7 +235,7 @@ export function Stage({ tcp }: { tcp: boolean }) {
                       className={`seg ep${selectedRecords.has(ri) ? " sel" : ""}`}
                       data-ep={model.recordEpoch[ri]}
                       style={{ flexGrow: model.cap.records[ri].len + 5 }}
-                      onClick={() => selectRecord(ri, { moveCursor: true })}
+                      onClick={() => selectRecord(ri)}
                       aria-label={labels[f.records.indexOf(ri)]}
                     />
                   ))}

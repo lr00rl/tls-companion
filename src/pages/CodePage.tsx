@@ -33,11 +33,13 @@ export default function CodePage({ path, line }: { path?: string; line?: number 
   const decl = data.state === "ready" && line ? enclosingDecl(data.data, line) : null;
   const declSym = decl ? symbols?.byKey.get(decl.ref) : undefined;
 
+  const q = filter.trim().toLowerCase();
+  const match = (f: { p: string }) => !q || f.p.toLowerCase().includes(q);
   const tree = meta.state === "ready" && (
     <nav className="file-tree" aria-label="文件">
       <input className="filter" placeholder="筛选文件" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="筛选文件" />
       {meta.data.packages.map((p) => {
-        const files = p.files.filter((f) => !filter || f.p.includes(filter));
+        const files = p.files.filter(match);
         if (!files.length) return null;
         return (
           <div key={p.path} className="pkg">
@@ -59,6 +61,11 @@ export default function CodePage({ path, line }: { path?: string; line?: number 
           </div>
         );
       })}
+      {q && !meta.data.packages.some((p) => p.files.some(match)) && (
+        <div className="empty">
+          <strong>没有匹配“{filter.trim()}”的文件</strong>
+        </div>
+      )}
     </nav>
   );
 
@@ -95,9 +102,14 @@ export default function CodePage({ path, line }: { path?: string; line?: number 
             {data.data.outline.map(([l, , r, k]) => {
               const s = symbols?.byKey.get(data.data.refs[r]);
               return (
-                <a key={l} className={`ol-item${decl && decl.start === l ? " cur" : ""}`} href={href({ page: "code", path: file, line: l })}>
+                <a
+                  key={l}
+                  className={`ol-item${decl && decl.start === l ? " cur" : ""}`}
+                  href={href({ page: "code", path: file, line: l })}
+                  title={s ? symDisplay(s) : data.data.refs[r]}
+                >
                   <span className={`ol-kind k${k}`}>{kindName[k]?.[0] ?? ""}</span>
-                  <span className="mono">{s ? symDisplay(s) : data.data.refs[r]}</span>
+                  <span className="ol-name mono">{s ? symDisplay(s) : data.data.refs[r]}</span>
                 </a>
               );
             })}
@@ -133,7 +145,15 @@ function Runs({ symKey, title }: { symKey: string; title: string }) {
   return (
     <div className="runs">
       <div className="kicker">运行记录</div>
-      <div className="runs-title mono">{title}</div>
+      {/* Break only after a dot or a closing paren, never inside a name. */}
+      <div className="runs-title mono">
+        {title.split(/(?<=[.)])/).map((part, i) => (
+          <span key={i}>
+            {i > 0 && <wbr />}
+            {part}
+          </span>
+        ))}
+      </div>
       {caps.state === "loading" && <div className="loading-bar" />}
       {caps.state === "ready" && rows.length === 0 && (
         <p className="muted">

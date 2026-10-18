@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { executingAt, useWB } from "../app/store";
 import { shortFn, type Call, type Model } from "../capture/model";
+import { useTreeNav } from "../ui/tree";
 
 interface Row {
   call: Call;
@@ -51,25 +52,39 @@ export function TracePanel() {
     list.current?.querySelector(".tr-row.focus")?.scrollIntoView({ block: "nearest" });
   }, [focus, open]);
 
-  if (!model) return <div className="panel" />;
-
   const rows: Row[] = [];
-  const visit = (ids: number[], depth: number) => {
-    for (let i = 0; i < ids.length; i++) {
-      const c = model.calls[ids[i]];
-      if (c.enter < range[0] || c.enter > range[1]) continue;
-      // Fold runs of identical leaf calls.
-      let repeat = 1;
-      while (i + repeat < ids.length && model.calls[ids[i + repeat]].fn === c.fn && !c.children.length && !model.calls[ids[i + repeat]].children.length) repeat++;
-      rows.push({ call: c, depth, repeat, hasKids: c.children.length > 0 });
-      if (open.has(c.id)) visit(c.children, depth + 1);
-      i += repeat - 1;
-    }
+  if (model) {
+    const visit = (ids: number[], depth: number) => {
+      for (let i = 0; i < ids.length; i++) {
+        const c = model.calls[ids[i]];
+        if (c.enter < range[0] || c.enter > range[1]) continue;
+        // Fold runs of identical leaf calls.
+        let repeat = 1;
+        while (i + repeat < ids.length && model.calls[ids[i + repeat]].fn === c.fn && !c.children.length && !model.calls[ids[i + repeat]].children.length) repeat++;
+        rows.push({ call: c, depth, repeat, hasKids: c.children.length > 0 });
+        if (open.has(c.id)) visit(c.children, depth + 1);
+        i += repeat - 1;
+      }
+    };
+    visit(
+      roots.map((r) => r.id),
+      0,
+    );
+  }
+
+  const toggle = (id: number) => {
+    const n = new Set(open);
+    if (n.has(id)) n.delete(id);
+    else n.add(id);
+    setOpen(n);
   };
-  visit(
-    roots.map((r) => r.id),
-    0,
+  const nav = useTreeNav(
+    rows.map((r) => ({ key: String(r.call.id), level: r.depth + 1, expandable: r.hasKids, open: open.has(r.call.id) })),
+    focus === null ? undefined : String(focus),
+    { toggle: (k) => toggle(Number(k)), activate: (k) => useWB.getState().selectCall(Number(k)) },
   );
+
+  if (!model) return <div className="panel" />;
 
   return (
     <div className="panel trace">
@@ -77,11 +92,16 @@ export function TracePanel() {
         <h2>调用追踪</h2>
         <span className="muted num">{rows.length} 行</span>
         <span className="spacer" />
-        <button className="btn" aria-pressed={whole} onClick={() => setWhole(!whole)} title="显示整条连接的调用，而不只是当前步骤">
-          {whole ? "整条连接" : "当前步骤"}
-        </button>
+        <div className="seg-ctl" role="group" aria-label="追踪范围">
+          <button className="btn" aria-pressed={!whole} onClick={() => setWhole(false)}>
+            当前步骤
+          </button>
+          <button className="btn" aria-pressed={whole} onClick={() => setWhole(true)}>
+            整条连接
+          </button>
+        </div>
       </div>
-      <div className="panel-body tr-list" ref={list}>
+      <div className="panel-body tr-list" ref={list} role="tree" aria-label="调用追踪" onKeyDown={nav.onKeyDown}>
         {rows.length === 0 && <div className="empty">这一步里没有被追踪的 crypto/tls 调用。</div>}
         {rows.map(({ call, depth, repeat, hasKids }) => {
           const isOpen = open.has(call.id);
@@ -89,6 +109,11 @@ export function TracePanel() {
           return (
             <div
               key={call.id}
+              role="treeitem"
+              aria-level={depth + 1}
+              aria-expanded={hasKids ? isOpen : undefined}
+              aria-selected={call.id === focus}
+              {...nav.rowProps(String(call.id))}
               className={`tr-row side-${call.side}${call.id === focus ? " focus" : ""}${done ? "" : " later"}`}
               style={{ paddingLeft: 6 + depth * 12 }}
               onClick={() => useWB.getState().selectCall(call.id)}
@@ -96,13 +121,11 @@ export function TracePanel() {
               {hasKids ? (
                 <button
                   className={`ft-tw${isOpen ? " open" : ""}`}
-                  aria-label={isOpen ? "折叠" : "展开"}
+                  tabIndex={-1}
+                  aria-hidden
                   onClick={(e) => {
                     e.stopPropagation();
-                    const n = new Set(open);
-                    if (isOpen) n.delete(call.id);
-                    else n.add(call.id);
-                    setOpen(n);
+                    toggle(call.id);
                   }}
                 />
               ) : (

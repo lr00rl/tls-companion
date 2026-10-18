@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { RfcPeek } from "../rfc/RfcPeek";
 import { Palette } from "../search/Palette";
 import { readPref } from "../ui/hooks";
@@ -55,6 +55,15 @@ export function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // A page change removes whatever had focus, and Chrome then resumes Tab
+  // order from where that element was. Starting from the top instead matches a
+  // normal page load. Focus the user placed somewhere is left alone.
+  const root = useRef<HTMLDivElement>(null);
+  const mainEl = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!document.activeElement || document.activeElement === document.body) root.current?.focus({ preventScroll: true });
+  }, [route.page]);
+
   useEffect(() => {
     const titles: Record<Route["page"], string> = {
       home: "TLS Companion",
@@ -68,7 +77,10 @@ export function App() {
   }, [route.page]);
 
   return (
-    <div className="app">
+    <div className="app" ref={root} tabIndex={-1}>
+      <button className="skip-link" onClick={() => mainEl.current?.focus()}>
+        跳到主要内容
+      </button>
       <header className="topbar">
         <a className="brand" href={href({ page: "home" })} aria-label="TLS Companion 首页">
           <span className="brand-mark" aria-hidden>
@@ -122,7 +134,7 @@ export function App() {
           </svg>
         </a>
       </header>
-      <main className="main">
+      <main className="main" ref={mainEl} tabIndex={-1}>
         <ErrorBoundary resetKey={location.hash}>
           <Suspense fallback={<div className="loading-bar" />}>
             {route.page === "home" && <Home />}
