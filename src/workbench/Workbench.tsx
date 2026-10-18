@@ -4,6 +4,7 @@ import { useWB, type MobilePane } from "../app/store";
 import { defaultScenario, scenarioById, scenarioDefs } from "../scenarios";
 import { load, useLoad } from "../data/load";
 import type { ScenarioDef } from "../scenarios/types";
+import { trapTab } from "../ui/focus";
 import { Splitter } from "../ui/Splitter";
 import { useMedia, usePref, useViewportHeight } from "../ui/hooks";
 import { CodePanel } from "./CodePanel";
@@ -63,8 +64,9 @@ function DesktopLayout({ tcp, wide, defId }: { tcp: boolean; wide: boolean; defI
   const [right, setRight] = usePref("wb.right", 620);
   const [stageH, setStageH] = usePref("wb.stage", 400);
   const [traceH, setTraceH] = usePref("wb.trace", 260);
-  // Short windows start with the step text folded; the reader's choice is kept.
-  const [cardOpen, setCardOpen] = usePref("wb.card", window.innerHeight >= 720);
+  // Until the reader folds or unfolds the step text, it follows the window:
+  // folded under 720px tall, so the inspector keeps room.
+  const [cardPref, setCardOpen] = usePref<boolean | null>("wb.card", null);
   const [drawer, setDrawer] = useState(false);
   const step = useWB((s) => s.step);
   const steps = useWB((s) => s.steps);
@@ -73,6 +75,7 @@ function DesktopLayout({ tcp, wide, defId }: { tcp: boolean; wide: boolean; defI
   // inspector below always keeps room (about 470px for the top bar, the
   // transport, and the inspector, plus the step card when the rail is folded).
   const vh = useViewportHeight();
+  const cardOpen = cardPref ?? vh >= 720;
   const stageMax = Math.max(220, vh - 470 - (wide ? 0 : cardOpen ? 150 : 40));
   const stageShown = Math.min(stageH, stageMax);
 
@@ -175,6 +178,7 @@ function StepDrawer({ def, onClose }: { def: ScenarioDef; onClose: () => void })
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => {
+          trapTab(e);
           if (e.key !== "Escape") return;
           e.stopPropagation();
           onClose();

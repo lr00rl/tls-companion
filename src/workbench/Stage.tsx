@@ -258,11 +258,16 @@ export function Stage({ tcp }: { tcp: boolean }) {
           })}
 
           {exec && (
-            <div className={`exec-tag${execSide === 1 ? " right" : ""}`} style={{ left: execSide === 0 ? xC : xS, top: y(t) }}>
+            <div
+              className={`exec-tag${execSide === 1 ? " right" : ""}`}
+              // Stops short of the time tag (about 110px) at the far side of the line.
+              style={{ left: execSide === 0 ? xC : xS, top: y(t), maxWidth: Math.max(80, Math.min(size.w * 0.44, size.w - padX - 130)) }}
+            >
               <span className="mono">{shortFn(exec.fn)}</span>
             </div>
           )}
-          <div className="now-tag num" style={{ top: y(t) }}>
+          {/* The call tag sits above the line on the running side; the time goes to the other side. */}
+          <div className={`now-tag num${exec && execSide === 1 ? " left" : ""}`} style={{ top: y(t) }}>
             {(t).toFixed(2)} RTT · {Math.round(t * rttMs)} ms
           </div>
         </div>

@@ -73,3 +73,25 @@ describe("figureLines on presentation-language structs", () => {
     expect(fig.has(short)).toBe(true);
   });
 });
+
+describe("figureLines edge cases from RFC 5246 and RFC 9849", () => {
+  const load = (n: number) => JSON.parse(readFileSync(new URL(`../public/data/rfc/rfc${n}.json`, import.meta.url), "utf8")) as RfcDoc;
+
+  it("keeps a two-line enum whose first line ends in '}' as a figure", () => {
+    const d = load(5246);
+    const fig = figureLines(d.lines);
+    const i = d.lines.findIndex((l) => /^\s*enum \{ null\(0\), rc4\(1\)/.test(l) || /^\s*enum \{.*\}\s*$/.test(l));
+    expect(i).toBeGreaterThan(0);
+    expect(fig.has(i), d.lines[i]).toBe(true);
+  });
+
+  it("lets a one-line list item ending in ';' wrap", () => {
+    const d = load(9849);
+    const fig = figureLines(d.lines);
+    const items = d.lines
+      .map((l, i) => [l, i] as const)
+      .filter(([l, i]) => /;\s*$/.test(l) && /^\s+(-|o|\*|\d+\.)\s+[A-Za-z]/.test(l) && !d.lines[i - 1]?.trim() && !d.lines[i + 1]?.trim());
+    expect(items.length).toBeGreaterThan(0);
+    for (const [l, i] of items) expect(fig.has(i), l).toBe(false);
+  });
+});

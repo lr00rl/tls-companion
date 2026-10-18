@@ -3,6 +3,7 @@ import { href, navigate } from "../app/route";
 import { rfcEditorUrl, usePeek } from "../app/peek";
 import { useWB } from "../app/store";
 import { load, useLoad } from "../data/load";
+import { trapTab } from "../ui/focus";
 import { RfcText } from "./RfcText";
 import "./rfc.css";
 
@@ -50,7 +51,7 @@ export function RfcPeek() {
 
   return (
     <div className="peek-scrim" onClick={close}>
-      <aside ref={panel} className="peek" role="dialog" aria-modal="true" tabIndex={-1} onClick={(e) => e.stopPropagation()} aria-label={`RFC ${rfc.n}`}>
+      <aside ref={panel} className="peek" role="dialog" aria-modal="true" tabIndex={-1} onKeyDown={trapTab} onClick={(e) => e.stopPropagation()} aria-label={`RFC ${rfc.n}`}>
         <header className="peek-head">
           <div>
             <div className="kicker">RFC {rfc.n}{doc.state === "ready" ? ` · ${doc.data.date}` : ""}</div>

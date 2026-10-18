@@ -40,13 +40,17 @@ export function figureLines(lines: string[]): Set<number> {
     for (; j < lines.length && lines[j].trim(); j++) {
       const t = lines[j].trim();
       if (looks(lines[j])) hits++;
-      // Presentation-language structs and enums: an opening "{" line or a
-      // closing "}" line, or a run of declarations that all end in ";".
-      if (t.endsWith("{") || t.startsWith("}")) braces = true;
+      // Presentation-language structs and enums: an opening "{" line, a
+      // closing "}" line, or a block led by enum, struct, or select (which
+      // covers one-line enums such as "enum { null(0), (255) }").
+      if (t.endsWith("{") || t.startsWith("}") || (j === i && /^(enum|struct|select)\b/.test(t))) braces = true;
       if (t.endsWith(";")) decls++;
     }
     const n = j - i;
-    if (braces || decls === n || hits / n >= 0.4) for (let k = i; k < j; k++) out.add(k);
+    // A run of declarations all ending in ";" is code, but a single line ending
+    // in ";" is usually a list item, unless it reads as a declaration.
+    const declBlock = decls === n && (n > 1 || /^(uint\d+|opaque|enum|struct|select)\b|<.*>|\[.*\]/.test(lines[i].trim()));
+    if (braces || declBlock || hits / n >= 0.4) for (let k = i; k < j; k++) out.add(k);
     i = j;
   }
   return out;

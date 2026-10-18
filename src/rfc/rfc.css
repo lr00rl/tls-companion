@@ -95,3 +95,10 @@
 .peek:focus {
   outline: none;
 }
+.rfc-missing {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--well);
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+}

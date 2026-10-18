@@ -6,6 +6,7 @@ import { kindName, symDisplay } from "../code/resolve";
 import { load, useLoad } from "../data/load";
 import { entries } from "../history/entries";
 import { scenarioDefs } from "../scenarios";
+import { trapTab } from "../ui/focus";
 import "./palette.css";
 
 interface Item {
@@ -196,7 +197,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
   const loading = symbols.state === "loading" || noteIndex.state === "loading";
   return (
     <div className="pal-scrim" onClick={onClose}>
-      <div className="palette" role="dialog" aria-modal="true" aria-label="搜索" onClick={(e) => e.stopPropagation()}>
+      <div className="palette" role="dialog" aria-modal="true" aria-label="搜索" onKeyDown={trapTab} onClick={(e) => e.stopPropagation()}>
         <div className="pal-input">
           <svg viewBox="0 0 16 16" aria-hidden>
             <circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.5" />

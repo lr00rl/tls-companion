@@ -251,6 +251,10 @@
   padding: 0 4px;
   pointer-events: none;
 }
+.now-tag.left {
+  right: auto;
+  left: 6px;
+}
 
 .legend {
   display: flex;

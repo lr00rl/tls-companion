@@ -120,6 +120,11 @@ export default function RfcPage({ n, section }: { n?: number; section?: string }
             </a>
           </div>
         )}
+        {doc.state === "ready" && section && !doc.data.sections.some((s) => s.id === section) && (
+          <div className="rfc-missing" role="status">
+            RFC {num} 没有 §{section}，下面从开头显示。
+          </div>
+        )}
         {doc.state === "ready" && <RfcText doc={doc.data} section={section} bundled={bundled} onSection={(m, s) => navigate({ page: "rfc", n: m, section: s })} />}
       </div>
       {wide && (

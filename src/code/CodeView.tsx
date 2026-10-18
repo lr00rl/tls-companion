@@ -96,6 +96,9 @@ export function CodeView({ target, symbols, goVersion, onNavigate, onRfc, exec, 
   // only when focus arrives by keyboard, so a click into the code leaves the
   // arrow keys to the workbench and text selection to the mouse.
   const [kb, setKb] = useState<{ line: number; tok: number } | null>(null);
+  // The line a pointer press landed on: after a click, Left and Right go to the
+  // workbench, and Up or Down start the cursor here, as in the trees.
+  const clicked = useRef<number | null>(null);
   useEffect(() => setKb((k) => (k && caret ? { line: caret, tok: 0 } : k)), [caret, target]);
   const lineLinks = (ln: number): { r: number; def: boolean }[] => {
     if (!prepared || !data) return [];
@@ -151,7 +154,16 @@ export function CodeView({ target, symbols, goVersion, onNavigate, onRfc, exec, 
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
-    if (!kb || !prepared) return;
+    if (!prepared) return;
+    if (!kb) {
+      if ((e.key === "ArrowDown" || e.key === "ArrowUp") && clicked.current) {
+        e.preventDefault();
+        e.stopPropagation();
+        setKb({ line: clicked.current, tok: 0 });
+        clicked.current = null;
+      }
+      return;
+    }
     const total = prepared.lines.length;
     const page = Math.max(1, Math.floor(scroll.height / LINE) - 2);
     const links = lineLinks(kb.line);
@@ -247,6 +259,7 @@ export function CodeView({ target, symbols, goVersion, onNavigate, onRfc, exec, 
       rows.push(
         <div
           key={ln}
+          data-ln={ln}
           className={`row${inRange ? " in-range" : ""}${ln === caret ? " caret" : ""}${ln === execCur ? " exec" : ""}${ln === kb?.line ? " kcur" : ""}`}
           style={{ top: l * LINE }}
         >
@@ -310,6 +323,10 @@ export function CodeView({ target, symbols, goVersion, onNavigate, onRfc, exec, 
           if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setKb(null);
         }}
         onKeyDown={onKeyDown}
+        onPointerDown={(e) => {
+          clicked.current = Number((e.target as HTMLElement).closest<HTMLElement>("[data-ln]")?.dataset.ln) || null;
+          setKb(null);
+        }}
         onScroll={(e) => setScroll({ top: e.currentTarget.scrollTop, height: e.currentTarget.clientHeight })}
         onClick={onClick}
         onPointerOver={onOver}
