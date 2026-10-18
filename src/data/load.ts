@@ -40,6 +40,12 @@ export function peek<T>(path: string): T | undefined {
   return settled.get(path) as T | undefined;
 }
 
+/** Whether RFC n ships with the site; undefined until the RFC index has loaded. */
+export function isBundledRfc(n: number): boolean | undefined {
+  const ix = peek<RfcIndexEntry[]>(paths.rfcs);
+  return ix ? ix.some((d) => d.n === n) : undefined;
+}
+
 export const paths = {
   codeMeta: "code/meta.json",
   symbols: "code/symbols.json",
@@ -72,6 +78,8 @@ export const load = {
 
 export interface SymbolIndex {
   files: string[];
+  /** The same files as a set: the only sources bundled with the site. */
+  indexed: Set<string>;
   list: Sym[];
   byKey: Map<string, Sym>;
 }
@@ -81,7 +89,7 @@ const symbolIndexes = new WeakMap<SymbolsFile, SymbolIndex>();
 function indexSymbols(f: SymbolsFile): SymbolIndex {
   let ix = symbolIndexes.get(f);
   if (!ix) {
-    ix = { files: f.files, list: f.symbols, byKey: new Map(f.symbols.map((s) => [s.k, s])) };
+    ix = { files: f.files, indexed: new Set(f.files), list: f.symbols, byKey: new Map(f.symbols.map((s) => [s.k, s])) };
     symbolIndexes.set(f, ix);
   }
   return ix;
@@ -97,8 +105,9 @@ export type Loadable<T> =
  * key must change whenever the loader would load something different.
  */
 export function useLoad<T>(key: string | null, loader: () => Promise<T>): Loadable<T> {
+  // retries carries over when a load settles, or the effect would run again.
   const [state, set] = useReducer(
-    (_: Store<T>, next: Store<T>) => next,
+    (prev: Store<T>, next: Store<T>) => ({ ...next, retries: next.retries ?? prev.retries }),
     { key: null, state: "loading" } as Store<T>,
   );
   useEffect(() => {

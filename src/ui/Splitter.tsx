@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 
 interface Props {
   /** "x" resizes widths (vertical bar), "y" resizes heights. */
@@ -16,6 +16,14 @@ interface Props {
 export function Splitter({ axis, value, min, max, dir = 1, onChange, label }: Props) {
   const start = useRef<{ p: number; v: number } | null>(null);
   const clamp = (v: number) => Math.max(min, Math.min(max, v));
+  // The layout can swap this handle out mid-drag (crossing the mobile
+  // breakpoint), which leaves no pointerup to clear the body cursor.
+  useEffect(
+    () => () => {
+      if (start.current) document.body.classList.remove("resizing-x", "resizing-y");
+    },
+    [],
+  );
   return (
     <div
       className={`splitter splitter-${axis}`}

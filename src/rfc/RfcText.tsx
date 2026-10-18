@@ -11,7 +11,24 @@ interface Props {
   bundled: Set<number>;
 }
 
-const ref = /(RFC ?(\d{3,5})(?:,? (?:Section|§) ?(\d+(?:\.\d+)*|[A-Z](?:\.\d+)*))?)|((?:Section|Appendix) (\d+(?:\.\d+)*|[A-Z](?:\.\d+)*))|\[RFC(\d{3,5})\]/g;
+// "RFC 5246, Section 7.4", "Section 4.2 of [RFC8446]", "Appendix B", "[RFC5280]".
+// A bare "Section N" points into the document being read.
+const ref =
+  /RFC ?(?<rfc>\d{3,5})(?:,? (?:Section|§) ?(?<rsec>\d+(?:\.\d+)*|[A-Z](?:\.\d+)*))?|(?:Section|Appendix) (?<sec>\d+(?:\.\d+)*|[A-Z](?:\.\d+)*)(?: of (?:\[RFC(?<of>\d{3,5})\]|RFC ?(?<of2>\d{3,5})))?|\[RFC(?<br>\d{3,5})\]/g;
+
+export interface RefMatch {
+  index: number;
+  text: string;
+  n: number;
+  sec?: string;
+}
+
+export function refsIn(line: string, self: number): RefMatch[] {
+  return [...line.matchAll(ref)].map((m) => {
+    const g = m.groups!;
+    return { index: m.index!, text: m[0], n: Number(g.rfc ?? g.of ?? g.of2 ?? g.br ?? self), sec: g.rsec ?? g.sec };
+  });
+}
 
 /** RFC plain text with section and RFC references turned into links. */
 export function RfcText({ doc, section, window: win, onSection, bundled }: Props) {
@@ -61,15 +78,12 @@ function linkify(line: string, self: number, onSection: Props["onSection"], bund
   if (!line) return " ";
   const out: ReactNode[] = [];
   let last = 0;
-  for (const m of line.matchAll(ref)) {
-    if (m.index! > last) out.push(line.slice(last, m.index));
-    const n = m[2] ? Number(m[2]) : m[6] ? Number(m[6]) : self;
-    const sec = m[3] ?? m[5];
-    const text = m[0];
+  for (const { index, text, n, sec } of refsIn(line, self)) {
+    if (index > last) out.push(line.slice(last, index));
     const external = !bundled.has(n);
     out.push(
       <a
-        key={m.index}
+        key={index}
         href={external ? `https://www.rfc-editor.org/rfc/rfc${n}${sec ? `#section-${sec}` : ""}` : `#/rfc/${n}${sec ? "/" + sec : ""}`}
         target={external ? "_blank" : undefined}
         rel="noopener"
@@ -82,7 +96,7 @@ function linkify(line: string, self: number, onSection: Props["onSection"], bund
         {text}
       </a>,
     );
-    last = m.index! + text.length;
+    last = index + text.length;
   }
   if (last < line.length) out.push(line.slice(last));
   return out;

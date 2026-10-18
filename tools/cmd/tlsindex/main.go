@@ -827,6 +827,9 @@ func trimDoc(s string) string {
 		cut := strings.LastIndex(s[:1600], "\n")
 		if cut < 800 {
 			cut = 1600
+			for cut > 0 && !utf8.RuneStart(s[cut]) {
+				cut--
+			}
 		}
 		s = s[:cut] + "\n…"
 	}

@@ -101,7 +101,7 @@ export function Stage({ tcp }: { tcp: boolean }) {
   if (sel?.kind === "msg") for (const [ri] of model.cap.messages[sel.index].parts) selectedRecords.add(ri);
 
   const exec = executingAt(model, cursor);
-  const execSide = model.cap.events[cursor]?.[1] ?? 0;
+  const execSide = exec?.side ?? model.cap.events[cursor]?.[1] ?? 0;
   const ticks: number[] = [];
   for (let k = 0; k <= lay.tMax; k += 0.5) ticks.push(k);
 

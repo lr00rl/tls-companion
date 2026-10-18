@@ -64,26 +64,40 @@ function FieldsTab({ model }: { model: Model }) {
   const symbols = useWB((s) => s.symbols);
   const [open, setOpen] = useState<Set<string>>(new Set());
 
+  // Selecting a field replaces sel, so the dissection keys on the message alone.
+  const selKind = sel?.kind;
+  const selIndex = sel?.index;
   const view = useMemo(() => {
-    if (!sel) return null;
-    if (sel.kind === "msg") {
-      const m = model.cap.messages[sel.index];
+    if (selKind === undefined || selIndex === undefined) return null;
+    if (selKind === "msg") {
+      const m = model.cap.messages[selIndex];
       const bytes = hexBytes(m.data);
       return { bytes, fields: dissect(bytes, { version: model.version, certs: model.cap.certs }), dir: m.dir, title: messageName(m), epoch: m.epoch };
     }
-    const r = model.cap.records[sel.index];
+    const r = model.cap.records[selIndex];
     const bytes = hexBytes(r.plain);
     return { bytes, fields: dissectRecordPlain(r.inner, bytes), dir: r.dir, title: contentTypes[r.inner] ?? "记录", epoch: r.prot?.secret ?? "plaintext" };
-  }, [sel, model]);
+  }, [selKind, selIndex, model]);
 
-  // Open the top level and the path to the selected field.
+  // A new message opens at its top level.
   useEffect(() => {
     if (!view) return;
     const next = new Set<string>();
     view.fields.forEach((f, i) => f.children && !f.len && next.add(String(i)));
-    if (sel?.kind === "msg" && sel.field) sel.field.forEach((_, i) => next.add(sel.field!.slice(0, i + 1).join("/")));
     setOpen(next);
-  }, [view, sel]);
+  }, [view]);
+
+  // Selecting a field opens the path to it and leaves the rest as the reader set it.
+  const fieldKey = sel?.kind === "msg" && sel.field ? sel.field.join("/") : "";
+  useEffect(() => {
+    if (!fieldKey) return;
+    const parts = fieldKey.split("/");
+    setOpen((o) => {
+      const next = new Set(o);
+      parts.forEach((_, i) => next.add(parts.slice(0, i + 1).join("/")));
+      return next;
+    });
+  }, [view, fieldKey]);
 
   const selPath = sel?.kind === "msg" ? sel.field : undefined;
   const selected = selPath && view ? findPath(view.fields, selPath) : undefined;
@@ -122,6 +136,7 @@ function FieldsTab({ model }: { model: Model }) {
             <button
               className={`ft-tw${isOpen ? " open" : ""}`}
               aria-label={isOpen ? "折叠" : "展开"}
+              aria-expanded={isOpen}
               onClick={(e) => {
                 e.stopPropagation();
                 const n = new Set(open);

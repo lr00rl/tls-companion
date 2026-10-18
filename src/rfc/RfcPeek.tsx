@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { href, navigate } from "../app/route";
-import { usePeek } from "../app/peek";
+import { rfcEditorUrl, usePeek } from "../app/peek";
 import { useWB } from "../app/store";
 import { load, useLoad } from "../data/load";
 import { RfcText } from "./RfcText";
@@ -24,9 +24,10 @@ export function RfcPeek() {
     return () => window.removeEventListener("keydown", onKey);
   }, [rfc, close]);
 
+  // Only reached when the click came before the RFC index loaded.
   useEffect(() => {
     if (rfc && index.state === "ready" && !bundled.has(rfc.n)) {
-      window.open(`https://www.rfc-editor.org/rfc/rfc${rfc.n}${rfc.section ? `#section-${rfc.section}` : ""}`, "_blank", "noopener");
+      window.open(rfcEditorUrl(rfc.n, rfc.section), "_blank", "noopener");
       close();
     }
   });

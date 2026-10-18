@@ -3,6 +3,7 @@ import { RfcPeek } from "../rfc/RfcPeek";
 import { Palette } from "../search/Palette";
 import { readPref } from "../ui/hooks";
 import { Workbench } from "../workbench/Workbench";
+import { ErrorBoundary } from "./ErrorBoundary";
 import { href, useRoute, type Route } from "./route";
 import "./app.css";
 
@@ -122,14 +123,16 @@ export function App() {
         </a>
       </header>
       <main className="main">
-        <Suspense fallback={<div className="loading-bar" />}>
-          {route.page === "home" && <Home />}
-          {route.page === "play" && <Workbench scenario={route.scenario} step={route.step} />}
-          {route.page === "code" && <CodePage path={route.path} line={route.line} />}
-          {route.page === "notes" && <NotesPage id={route.id} anchor={route.anchor} />}
-          {route.page === "history" && <HistoryPage entry={route.entry} />}
-          {route.page === "rfc" && <RfcPage n={route.n} section={route.section} />}
-        </Suspense>
+        <ErrorBoundary resetKey={location.hash}>
+          <Suspense fallback={<div className="loading-bar" />}>
+            {route.page === "home" && <Home />}
+            {route.page === "play" && <Workbench scenario={route.scenario} step={route.step} />}
+            {route.page === "code" && <CodePage path={route.path} line={route.line} />}
+            {route.page === "notes" && <NotesPage id={route.id} anchor={route.anchor} />}
+            {route.page === "history" && <HistoryPage entry={route.entry} />}
+            {route.page === "rfc" && <RfcPage n={route.n} section={route.section} />}
+          </Suspense>
+        </ErrorBoundary>
       </main>
       <RfcPeek />
       {palette && <Palette onClose={() => setPalette(false)} />}

@@ -25,7 +25,7 @@ export function TracePanel() {
   const current = model ? executingAt(model, cursor) : null;
   const focus = traceSel ?? current?.id ?? null;
 
-  // Expand two levels, plus the path down to the focused call.
+  // A new range opens two levels.
   useEffect(() => {
     if (!model) return;
     const s = new Set<number>();
@@ -33,12 +33,18 @@ export function TracePanel() {
       s.add(r.id);
       for (const c of r.children) s.add(c);
     }
-    let id = focus;
-    while (id !== null && id >= 0) {
-      s.add(id);
-      id = model.calls[id].parent;
-    }
     setOpen(s);
+  }, [model, roots]);
+
+  // Moving the cursor opens the path down to the focused call and keeps
+  // whatever the reader expanded or collapsed by hand.
+  useEffect(() => {
+    if (!model || focus === null) return;
+    setOpen((o) => {
+      const s = new Set(o);
+      for (let id = focus; id >= 0; id = model.calls[id].parent) s.add(id);
+      return s;
+    });
   }, [model, roots, focus]);
 
   useEffect(() => {

@@ -214,6 +214,10 @@ func decode(r *recorder) ([]record, []message, session, error) {
 					pt = pt[:len(pt)-1]
 					pad++
 				}
+				if len(pt) == 0 {
+					// RFC 8446 §5.4: a record with no non-zero byte is an unexpected_message.
+					return nil, nil, sess, fmt.Errorf("record %d (dir %d): plaintext is all padding", i, rec.Dir)
+				}
 				rec.Inner = int(pt[len(pt)-1])
 				rec.plain = pt[:len(pt)-1]
 				rec.Padding = pad

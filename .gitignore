@@ -4,3 +4,4 @@ build/
 public/data/
 .DS_Store
 *.log
+*.tsbuildinfo

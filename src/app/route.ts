@@ -4,7 +4,7 @@ import { useSyncExternalStore } from "react";
 // share, and back all land in the same place.
 //
 //   #/                         home
-//   #/play/<scenario>/<step>   workbench
+//   #/play/<scenario>/<step>   workbench, step counted from 1
 //   #/code/<path>?l=<line>     code browser
 //   #/notes/<id>/<anchor>      notes
 //   #/history/<entry>          evolution
@@ -18,13 +18,27 @@ export type Route =
   | { page: "history"; entry?: string }
   | { page: "rfc"; n?: number; section?: string };
 
+// A truncated or hand-edited link can carry a broken percent escape. parse runs
+// inside React's route snapshot, so it keeps the raw segment instead of throwing.
+function decode(s: string): string {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+}
+
 export function parse(hash: string): Route {
   const [pathPart, query = ""] = hash.replace(/^#\/?/, "").split("?");
-  const parts = pathPart.split("/").filter(Boolean).map(decodeURIComponent);
+  const parts = pathPart.split("/").filter(Boolean).map(decode);
   const q = new URLSearchParams(query);
   switch (parts[0]) {
-    case "play":
-      return { page: "play", scenario: parts[1], step: parts[2] !== undefined ? Number(parts[2]) : undefined };
+    case "play": {
+      // The URL counts steps from 1, as the transport bar does; Route.step is
+      // the zero-based index everything else uses.
+      const n = Math.trunc(Number(parts[2]));
+      return { page: "play", scenario: parts[1], step: Number.isFinite(n) ? Math.max(0, n - 1) : undefined };
+    }
     case "code": {
       const line = q.get("l");
       return { page: "code", path: parts.slice(1).join("/") || undefined, line: line ? Number(line) : undefined };
@@ -46,7 +60,7 @@ export function href(r: Route): string {
     case "home":
       return "#/";
     case "play":
-      return `#/play${r.scenario ? "/" + r.scenario : ""}${r.scenario && r.step !== undefined ? "/" + r.step : ""}`;
+      return `#/play${r.scenario ? "/" + r.scenario : ""}${r.scenario && r.step !== undefined ? "/" + (r.step + 1) : ""}`;
     case "code":
       return `#/code${r.path ? "/" + enc(r.path) : ""}${r.line ? "?l=" + r.line : ""}`;
     case "notes":

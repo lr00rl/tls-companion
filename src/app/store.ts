@@ -123,11 +123,15 @@ export const useWB = create<WorkbenchState>((set, get) => ({
       set({ loadError: `没有名为 ${scenario} 的场景` });
       return;
     }
+    // model is cleared whenever a load starts, so a non-null model always
+    // belongs to the scenario field and a failed load is retried, not skipped.
     if (get().scenario === scenario && get().model) {
-      if (step !== undefined && step !== get().step) get().goStep(step, { keepUrl: true });
+      if (step === undefined) return;
+      const at = Math.min(step, get().steps.length - 1);
+      if (at !== get().step || at !== step) get().goStep(at, { keepUrl: at === step });
       return;
     }
-    set({ loading: true, loadError: null, scenario, playing: false });
+    set({ loading: true, loadError: null, scenario, model: null, steps: [], errors: [], step: 0, cursor: 0, playing: false });
     try {
       const [cap] = await Promise.all([load.capture(scenario), get().ensureSymbols()]);
       if (get().scenario !== scenario) return;
@@ -135,8 +139,10 @@ export const useWB = create<WorkbenchState>((set, get) => ({
       const { steps, errors } = resolveSteps(model, def);
       if (errors.length) console.warn("[tls-companion] unresolved steps", errors);
       set({ model, steps, errors, loading: false, sel: null, traceSel: null, codeBack: [], codeFwd: [] });
-      get().goStep(Math.min(step ?? 0, Math.max(0, steps.length - 1)), { keepUrl: step !== undefined });
+      const at = Math.min(step ?? 0, Math.max(0, steps.length - 1));
+      get().goStep(at, { keepUrl: step === at });
     } catch (e) {
+      if (get().scenario !== scenario) return;
       set({ loading: false, loadError: (e as Error).message });
     }
   },
@@ -171,14 +177,20 @@ export const useWB = create<WorkbenchState>((set, get) => ({
     }
     if (opts?.follow) {
       const c = executingAt(model, cursor);
-      if (c?.file && !c.file.startsWith("app:")) {
-        const parent = c.parent >= 0 ? model.calls[c.parent] : null;
-        const ps = parent && get().symbols?.byKey.get(parent.fn);
+      const symbols = get().symbols;
+      // Calls made from bytes, io, bufio, or slices appear in the trace, but
+      // only crypto/tls and its key dependencies are bundled. Show the nearest
+      // caller whose call site is in a bundled file.
+      let site = c;
+      while (site && !(site.file && symbols?.indexed.has(site.file))) site = site.parent >= 0 ? model.calls[site.parent] : null;
+      if (site?.file) {
+        const parent = site.parent >= 0 ? model.calls[site.parent] : null;
+        const ps = parent && symbols?.byKey.get(parent.fn);
         patch.code = {
-          file: c.file,
-          line: c.line,
-          range: ps && ps.f === c.file ? [ps.l, ps.e ?? ps.l] : undefined,
-          reason: `正在执行：调用 ${c.fn.split(".").slice(-2).join(".")}`,
+          file: site.file,
+          line: site.line,
+          range: ps && ps.f === site.file ? [ps.l, ps.e ?? ps.l] : undefined,
+          reason: `正在执行：调用 ${site.fn.split(".").slice(-2).join(".")}`,
         };
       }
       patch.traceSel = c ? c.id : null;

@@ -47,7 +47,7 @@ function RecordCard({ model, index }: { model: Model; index: number }) {
 
   let plainText: string | null = null;
   if (r.inner === 23) {
-    const bytes = new Uint8Array(r.plain.match(/../g)!.map((x) => parseInt(x, 16)));
+    const bytes = new Uint8Array((r.plain.match(/../g) ?? []).map((x) => parseInt(x, 16)));
     plainText = new TextDecoder().decode(bytes);
   }
 

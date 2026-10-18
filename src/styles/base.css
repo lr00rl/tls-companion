@@ -284,6 +284,10 @@ kbd {
   color: var(--ink-2);
   margin-bottom: 4px;
 }
+.app-crash {
+  margin: 48px auto;
+  max-width: 520px;
+}
 
 .loading-bar {
   height: 2px;

@@ -43,32 +43,46 @@ export default function NotesPage({ id, anchor }: { id?: string; anchor?: string
   const links = useMemo(() => stepLinks(noteId), [noteId]);
   const scenarioTitle = (sid: string) => (captures.state === "ready" ? captures.data.find((c) => c.id === sid)?.title : sid) ?? sid;
 
-  // Inject workbench links under cited headings, draw mermaid, scroll to anchor.
+  // Put workbench links under cited headings. Scenario titles arrive with the
+  // captures index, which may load after the note, so existing boxes are
+  // refilled in place rather than skipped.
   useEffect(() => {
     const el = article.current;
     if (!el || note.state !== "ready") return;
     for (const [h, ls] of links) {
       if (!h) continue;
       const head = el.querySelector(`[id="${CSS.escape(h)}"]`);
-      if (!head || head.nextElementSibling?.classList.contains("wb-links")) continue;
-      const box = document.createElement("div");
-      box.className = "wb-links";
+      if (!head) continue;
+      let box = head.nextElementSibling;
+      if (!box?.classList.contains("wb-links")) {
+        box = document.createElement("div");
+        box.className = "wb-links";
+        head.after(box);
+      }
       box.innerHTML =
         `<span>在工作台里看：</span>` +
         ls
           .map((l) => `<a href="${href({ page: "play", scenario: l.scenario, step: l.step })}">${escape(scenarioTitle(l.scenario))} · ${l.step + 1} ${escape(l.title)}</a>`)
           .join("");
-      head.after(box);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [note.state, noteId, links, captures.state]);
+
+  // Draw mermaid and jump to the anchor once per note or anchor, so a late
+  // captures load does not pull the reader back to the top.
+  useEffect(() => {
+    const el = article.current;
+    if (!el || note.state !== "ready") return;
     if (note.data.mermaid > 0) void drawMermaid(el);
     // Wait for the article to lay out before jumping.
     requestAnimationFrame(() => {
-      const target = anchor ? el.querySelector(`[id="${CSS.escape(decodeURIComponent(anchor))}"]`) : null;
+      // parse() has already decoded the anchor.
+      const target = anchor ? el.querySelector(`[id="${CSS.escape(anchor)}"]`) : null;
       if (target) target.scrollIntoView({ block: "start" });
       else el.closest(".notes-scroll")?.scrollTo({ top: 0 });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [note.state, noteId, anchor, links, captures.state]);
+  }, [note.state, noteId, anchor]);
 
   // Scroll spy for the table of contents.
   useEffect(() => {
