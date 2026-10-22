@@ -3,12 +3,14 @@ import { href, navigate } from "../app/route";
 import { rfcEditorUrl, usePeek } from "../app/peek";
 import { useWB } from "../app/store";
 import { load, useLoad } from "../data/load";
+import { useTx } from "../i18n/lang";
 import { trapTab } from "../ui/focus";
 import { RfcText } from "./RfcText";
 import "./rfc.css";
 
 /** A side drawer with one RFC section, openable from anywhere. */
 export function RfcPeek() {
+  const t = useTx();
   const rfc = usePeek((s) => s.rfc);
   const close = usePeek((s) => s.close);
   const index = useLoad("rfcs", load.rfcs);
@@ -55,13 +57,13 @@ export function RfcPeek() {
         <header className="peek-head">
           <div>
             <div className="kicker">RFC {rfc.n}{doc.state === "ready" ? ` · ${doc.data.date}` : ""}</div>
-            <strong>{sec ? `${sec.id}. ${sec.title}` : doc.state === "ready" ? doc.data.title : "加载中"}</strong>
+            <strong>{sec ? `${sec.id}. ${sec.title}` : doc.state === "ready" ? doc.data.title : t("Loading", "加载中")}</strong>
           </div>
           <span className="spacer" />
           <a className="btn outline" href={href({ page: "rfc", n: rfc.n, section: rfc.section })} onClick={close}>
-            全文
+            {t("Full text", "全文")}
           </a>
-          <button className="btn" onClick={close} aria-label="关闭">
+          <button className="btn" onClick={close} aria-label={t("Close", "关闭")}>
             <svg viewBox="0 0 16 16" aria-hidden>
               <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" />
             </svg>
@@ -69,25 +71,28 @@ export function RfcPeek() {
         </header>
         {sites.length > 0 && symbols && (
           <div className="peek-cites">
-            <span className="muted">Go 源码中引用这一节的注释：</span>
+            <span className="muted">{t("Go comments that cite this section:", "Go 源码中引用这一节的注释：")}</span>
             {sites.slice(0, 8).map(([fi, line], i) => (
               <button
                 key={i}
                 className="chip"
                 onClick={() => {
-                  useWB.getState().openCode({ file: symbols.files[fi], line, reason: `注释引用 RFC ${key.replace("#", " §")}` }, { push: true });
+                  useWB.getState().openCode({ file: symbols.files[fi], line, reason: [`Comment cites RFC ${key.replace("#", " §")}`, `注释引用 RFC ${key.replace("#", " §")}`] }, { push: true });
                   close();
                 }}
               >
                 {symbols.files[fi].split("/").pop()}:{line}
               </button>
             ))}
-            {sites.length > 8 && <span className="muted">等 {sites.length} 处</span>}
+            {sites.length > 8 && <span className="muted">{t(`${sites.length} in all`, `等 ${sites.length} 处`)}</span>}
           </div>
         )}
         <div className="peek-body">
           {doc.state === "loading" && <div className="loading-bar" />}
-          {doc.state === "error" && <div className="empty">规范加载失败：{doc.error.message}</div>}
+          {doc.state === "error" && <div className="empty">
+              {t("Could not load the RFC: ", "规范加载失败：")}
+              {doc.error.message}
+            </div>}
           {doc.state === "ready" && (
             <RfcText
               doc={doc.data}

@@ -7,6 +7,8 @@ import { CodeView } from "../code/CodeView";
 import { enclosingDecl, kindName, symDisplay } from "../code/resolve";
 import { load, useLoad } from "../data/load";
 import { EV_ENTER } from "../data/types";
+import { scenarioFor } from "../i18n/content";
+import { useLang, useTx } from "../i18n/lang";
 import { scenarioDefs } from "../scenarios";
 import { resolveSteps, stepAt } from "../scenarios/resolve";
 import { useMedia } from "../ui/hooks";
@@ -16,6 +18,7 @@ const DEFAULT = "crypto/tls/handshake_client_tls13.go";
 const traced = /^crypto\/(tls|internal\/fips140\/tls1[23])\./;
 
 export default function CodePage({ path, line }: { path?: string; line?: number }) {
+  const t = useTx();
   const meta = useLoad("codeMeta", load.codeMeta);
   const symbols = useWB((s) => s.symbols);
   const [filter, setFilter] = useState("");
@@ -36,8 +39,8 @@ export default function CodePage({ path, line }: { path?: string; line?: number 
   const q = filter.trim().toLowerCase();
   const match = (f: { p: string }) => !q || f.p.toLowerCase().includes(q);
   const tree = meta.state === "ready" && (
-    <nav className="file-tree" aria-label="文件">
-      <input className="filter" placeholder="筛选文件" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="筛选文件" />
+    <nav className="file-tree" aria-label={t("Files", "文件")}>
+      <input className="filter" name="file-filter" autoComplete="off" spellCheck={false} placeholder={t("Filter files…", "筛选文件…")} value={filter} onChange={(e) => setFilter(e.target.value)} aria-label={t("Filter files", "筛选文件")} />
       {meta.data.packages.map((p) => {
         const files = p.files.filter(match);
         if (!files.length) return null;
@@ -51,7 +54,7 @@ export default function CodePage({ path, line }: { path?: string; line?: number 
                 key={f.p}
                 className={`file-link mono${f.p === file ? " cur" : ""}${f.ignored ? " ignored" : ""}`}
                 href={href({ page: "code", path: f.p })}
-                title={f.constraint ? `构建约束：${f.constraint}` : undefined}
+                title={f.constraint ? t(`Build constraint: ${f.constraint}`, `构建约束：${f.constraint}`) : undefined}
                 onClick={() => setDrawer(false)}
               >
                 {f.p.split("/").pop()}
@@ -63,7 +66,7 @@ export default function CodePage({ path, line }: { path?: string; line?: number 
       })}
       {q && !meta.data.packages.some((p) => p.files.some(match)) && (
         <div className="empty">
-          <strong>没有匹配“{filter.trim()}”的文件</strong>
+          <strong>{t(`No file matches "${filter.trim()}"`, `没有匹配“${filter.trim()}”的文件`)}</strong>
         </div>
       )}
     </nav>
@@ -88,7 +91,7 @@ export default function CodePage({ path, line }: { path?: string; line?: number 
           toolbar={
             !wide && (
               <button className="btn outline" onClick={() => setDrawer(true)}>
-                文件
+                {t("Files", "文件")}
               </button>
             )
           }
@@ -98,9 +101,12 @@ export default function CodePage({ path, line }: { path?: string; line?: number 
         <aside className="cp-right">
           {declSym && <Runs symKey={declSym.k} title={symDisplay(declSym)} />}
           <div className="outline">
-            <div className="kicker">大纲 · {data.data.outline.length}</div>
+            <div className="kicker">
+              {t("Outline", "大纲")} · {data.data.outline.length}
+            </div>
             {data.data.outline.map(([l, , r, k]) => {
               const s = symbols?.byKey.get(data.data.refs[r]);
+              const kind = kindName(k);
               return (
                 <a
                   key={l}
@@ -108,7 +114,9 @@ export default function CodePage({ path, line }: { path?: string; line?: number 
                   href={href({ page: "code", path: file, line: l })}
                   title={s ? symDisplay(s) : data.data.refs[r]}
                 >
-                  <span className={`ol-kind k${k}`}>{kindName[k]?.[0] ?? ""}</span>
+                  <span className={`ol-kind k${k}`} aria-label={kind} title={kind}>
+                    {kind[0] ?? ""}
+                  </span>
                   <span className="ol-name mono">{s ? symDisplay(s) : data.data.refs[r]}</span>
                 </a>
               );
@@ -122,10 +130,12 @@ export default function CodePage({ path, line }: { path?: string; line?: number 
 
 /** Where a function ran in the recorded scenarios, with links into the workbench. */
 function Runs({ symKey, title }: { symKey: string; title: string }) {
+  const t = useTx();
+  const lang = useLang();
   const caps = useLoad("allCaptures", () => Promise.all(scenarioDefs.map((d) => load.capture(d.id))));
   const rows = useMemo(() => {
     if (caps.state !== "ready") return [];
-    return caps.data.flatMap((cap, i) => {
+    return caps.data.flatMap((cap) => {
       const fi = cap.fns.indexOf(symKey);
       if (fi < 0) return [];
       let count = 0;
@@ -137,14 +147,15 @@ function Runs({ symKey, title }: { symKey: string; title: string }) {
         }
       });
       const model = buildModel(cap);
-      const { steps } = resolveSteps(model, scenarioDefs[i]);
+      const def = scenarioFor(lang, cap.id)!;
+      const { steps } = resolveSteps(model, def);
       const si = stepAt(steps, first);
-      return [{ id: cap.id, title: cap.title, count, step: si, stepTitle: steps[si]?.title ?? "" }];
+      return [{ id: cap.id, title: def.title, count, step: si, stepTitle: steps[si]?.title ?? "" }];
     });
-  }, [caps, symKey]);
+  }, [caps, symKey, lang]);
   return (
     <div className="runs">
-      <div className="kicker">运行记录</div>
+      <div className="kicker">{t("Where it ran", "运行记录")}</div>
       {/* Break only after a dot or a closing paren, never inside a name. */}
       <div className="runs-title mono">
         {title.split(/(?<=[.)])/).map((part, i) => (
@@ -157,14 +168,16 @@ function Runs({ symKey, title }: { symKey: string; title: string }) {
       {caps.state === "loading" && <div className="loading-bar" />}
       {caps.state === "ready" && rows.length === 0 && (
         <p className="muted">
-          {traced.test(symKey) ? "五个采集场景都没有执行到这个函数。" : "执行追踪只覆盖 crypto/tls 和 fips140 的 tls12、tls13 包，这个函数不在其中。"}
+          {traced.test(symKey)
+            ? t("None of the five captures reached this function.", "五个采集场景都没有执行到这个函数。")
+            : t("The trace covers crypto/tls and the fips140 tls12 and tls13 packages. This function is outside that set.", "执行追踪只覆盖 crypto/tls 和 fips140 的 tls12、tls13 包，这个函数不在其中。")}
         </p>
       )}
       {rows.map((r) => (
         <a key={r.id} className="run-item" href={href({ page: "play", scenario: r.id, step: r.step })}>
           <strong>{r.title}</strong>
           <span>
-            调用 {r.count} 次，第一次在步骤 {r.step + 1}：{r.stepTitle}
+            {t(`called ${r.count} times, first at step ${r.step + 1}: ${r.stepTitle}`, `调用 ${r.count} 次，第一次在步骤 ${r.step + 1}：${r.stepTitle}`)}
           </span>
         </a>
       ))}

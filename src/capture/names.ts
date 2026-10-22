@@ -1,6 +1,8 @@
 // IANA registry names for the values a capture contains. Only what the
 // recorded scenarios and common real-world hellos use; unknown values render as
-// hex with "未知".
+import { tx } from "../i18n/lang";
+
+// hex with "unknown".
 
 export const contentTypes: Record<number, string> = {
   20: "ChangeCipherSpec",
@@ -189,7 +191,7 @@ export function isGrease(v: number): boolean {
 
 export function nameOr(table: Record<number, string>, v: number, width = 4): string {
   if (isGrease(v)) return `GREASE 0x${v.toString(16).padStart(width, "0")}`;
-  return table[v] ?? `未知 0x${v.toString(16).padStart(width, "0")}`;
+  return table[v] ?? `${tx("unknown", "未知")} 0x${v.toString(16).padStart(width, "0")}`;
 }
 
 export const hrrRandom = "cf21ad74e59a6111be1d8c021e65b891c2a211167abb8c5e079e09e2c8a8339c";

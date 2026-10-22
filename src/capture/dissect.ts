@@ -2,6 +2,7 @@
 // protocol analyzer does. Every field can carry the Go struct field that holds
 // it (so the UI can find the exact marshal and unmarshal lines through the
 // reference index) and the RFC section that defines it.
+import { tx } from "../i18n/lang";
 import { dissectCertificate } from "./der";
 import {
   alertDescriptions,
@@ -100,7 +101,7 @@ function vector(r: Reader, lenBytes: 1 | 2 | 3, name: string, body: (r: Reader, 
     f.children = [lenField, { name: "data", start: bodyStart, end, value: hexOf(r.b, bodyStart, end) }];
   } else {
     f.children = [lenField, ...out];
-    if (!f.value) f.value = plural(n, "字节");
+    if (!f.value) f.value = plural(n, tx("bytes", "字节"));
   }
   return f;
 }
@@ -180,25 +181,25 @@ function keyShareEntry(r: Reader): Field {
     const n = end - rr.p;
     if (g === 0x11ec && n === 1216) {
       return [
-        { name: "ML-KEM-768 封装密钥", start: rr.p, end: rr.p + 1184, value: hexOf(rr.b, rr.p, rr.p + 1184, 16) + "…（1184 字节）" },
-        { name: "X25519 公钥", start: rr.p + 1184, end, value: hexOf(rr.b, rr.p + 1184, end) },
+        { name: tx("ML-KEM-768 encapsulation key", "ML-KEM-768 封装密钥"), start: rr.p, end: rr.p + 1184, value: hexOf(rr.b, rr.p, rr.p + 1184, 16) + tx("… (1184 bytes)", "…（1184 字节）") },
+        { name: tx("X25519 public key", "X25519 公钥"), start: rr.p + 1184, end, value: hexOf(rr.b, rr.p + 1184, end) },
       ];
     }
     if (g === 0x11ec && n === 1120) {
       return [
-        { name: "ML-KEM-768 密文", start: rr.p, end: rr.p + 1088, value: hexOf(rr.b, rr.p, rr.p + 1088, 16) + "…（1088 字节）" },
-        { name: "X25519 公钥", start: rr.p + 1088, end, value: hexOf(rr.b, rr.p + 1088, end) },
+        { name: tx("ML-KEM-768 ciphertext", "ML-KEM-768 密文"), start: rr.p, end: rr.p + 1088, value: hexOf(rr.b, rr.p, rr.p + 1088, 16) + tx("… (1088 bytes)", "…（1088 字节）") },
+        { name: tx("X25519 public key", "X25519 公钥"), start: rr.p + 1088, end, value: hexOf(rr.b, rr.p + 1088, end) },
       ];
     }
-    return hexOf(rr.b, rr.p, end, 32) + (n > 32 ? `（${n} 字节）` : "");
+    return hexOf(rr.b, rr.p, end, 32) + (n > 32 ? tx(` (${n} bytes)`, `（${n} 字节）`) : "");
   });
-  return { name: "KeyShareEntry", start: s, end: r.p, value: `${nameOr(groups, g)}，${r.p - s - 4} 字节`, children: [gf, key] };
+  return { name: "KeyShareEntry", start: s, end: r.p, value: tx(`${nameOr(groups, g)}, ${r.p - s - 4} bytes`, `${nameOr(groups, g)}，${r.p - s - 4} 字节`), children: [gf, key] };
 }
 
 function extensionBody(r: Reader, type: number, who: Who, end: number, ctx: DissectCtx): Field[] | string {
   switch (type) {
     case 0:
-      if (end === r.p) return "（空，表示服务器用了 SNI）";
+      if (end === r.p) return tx("(empty: the server used the SNI)", "（空，表示服务器用了 SNI）");
       return [
         vector(r, 2, "server_name_list", (rr, e) => {
           const out: Field[] = [];
@@ -275,7 +276,7 @@ function extensionBody(r: Reader, type: number, who: Who, end: number, ctx: Diss
           const out: Field[] = [];
           while (rr.p < e) {
             const s = rr.p;
-            const id = vector(rr, 2, "identity", (r3, e3) => `票据 ${e3 - r3.p} 字节`, { go: S + "pskIdentity.label" });
+            const id = vector(rr, 2, "identity", (r3, e3) => tx(`ticket, ${e3 - r3.p} bytes`, `票据 ${e3 - r3.p} 字节`), { go: S + "pskIdentity.label" });
             const as = rr.p;
             const age = rr.u32();
             out.push({
@@ -294,23 +295,23 @@ function extensionBody(r: Reader, type: number, who: Who, end: number, ctx: Diss
         }),
       ];
     case 0xff01:
-      return [vector(r, 1, "renegotiated_connection", (rr, e) => (e === rr.p ? "（空：首次握手）" : rr.hex(rr.p, e)))];
+      return [vector(r, 1, "renegotiated_connection", (rr, e) => (e === rr.p ? tx("(empty: first handshake)", "（空：首次握手）") : rr.hex(rr.p, e)))];
     case 23:
     case 18:
     case 22:
     case 49:
-      return end === r.p ? "（空）" : r.hex(r.p, end);
+      return end === r.p ? tx("(empty)", "（空）") : r.hex(r.p, end);
     case 42:
       if (who === "nst" && end - r.p === 4) return `max_early_data_size = ${r.u32()}`;
-      return end === r.p ? "（空）" : r.hex(r.p, end);
+      return end === r.p ? tx("(empty)", "（空）") : r.hex(r.p, end);
     case 35:
-      return end === r.p ? "（空：支持票据，没有旧票据）" : `票据 ${end - r.p} 字节`;
+      return end === r.p ? tx("(empty: tickets supported, none saved)", "（空：支持票据，没有旧票据）") : tx(`ticket, ${end - r.p} bytes`, `票据 ${end - r.p} 字节`);
     case 5:
       if (who === "ch") return r.hex(r.p, end);
-      return end === r.p ? "（空）" : r.hex(r.p, end);
+      return end === r.p ? tx("(empty)", "（空）") : r.hex(r.p, end);
     default:
       void ctx;
-      return end === r.p ? "（空）" : r.hex(r.p, end);
+      return end === r.p ? tx("(empty)", "（空）") : r.hex(r.p, end);
   }
 }
 
@@ -331,7 +332,7 @@ function extensionsBlock(r: Reader, who: Who, ctx: DissectCtx): Field {
         go: go ? S + go : undefined,
         rfc: isGrease(type) ? [8701, "2"] : extRfc[type],
       };
-      if (typeof body.value === "string" && !body.value.endsWith("字节")) f.value = body.value;
+      if (typeof body.value === "string" && !body.value.endsWith(tx("bytes", "字节"))) f.value = body.value;
       else f.value = summarize(f);
       out.push(f);
     }
@@ -342,8 +343,8 @@ function extensionsBlock(r: Reader, who: Who, ctx: DissectCtx): Field {
 function summarize(f: Field): string {
   const leaves = (f.children ?? []).slice(1).flatMap((c) => (c.len ? [] : c.children ? c.children.filter((x) => !x.len) : [c]));
   const vals = leaves.map((c) => c.value?.replace(/ \(0x[0-9a-f]+\)$/, "") ?? c.name).filter(Boolean);
-  const s = vals.slice(0, 4).join("，");
-  return vals.length > 4 ? `${s} 等 ${vals.length} 项` : s;
+  const s = vals.slice(0, 4).join(tx(", ", "，"));
+  return vals.length > 4 ? tx(`${s}, ${vals.length} total`, `${s} 等 ${vals.length} 项`) : s;
 }
 
 function clientHello(r: Reader, ctx: DissectCtx): Field[] {
@@ -354,9 +355,9 @@ function clientHello(r: Reader, ctx: DissectCtx): Field[] {
   s = r.p;
   r.p += 32;
   out.push({ name: "random", start: s, end: r.p, value: r.hex(s, r.p), go: S + "clientHelloMsg.random", rfc: [8446, "4.1.2"] });
-  out.push(vector(r, 1, "legacy_session_id", (rr, e) => (e === rr.p ? "（空）" : rr.hex(rr.p, e)), { go: S + "clientHelloMsg.sessionId", rfc: [8446, "4.1.2"] }));
+  out.push(vector(r, 1, "legacy_session_id", (rr, e) => (e === rr.p ? tx("(empty)", "（空）") : rr.hex(rr.p, e)), { go: S + "clientHelloMsg.sessionId", rfc: [8446, "4.1.2"] }));
   const suites = vector(r, 2, "cipher_suites", (rr, e) => u16List(rr, e, cipherSuites, "CipherSuite"), { go: S + "clientHelloMsg.cipherSuites", rfc: [8446, "4.1.2"] });
-  suites.value = `${(suites.children?.length ?? 1) - 1} 个套件`;
+  suites.value = tx(`${(suites.children?.length ?? 1) - 1} suites`, `${(suites.children?.length ?? 1) - 1} 个套件`);
   out.push(suites);
   out.push(vector(r, 1, "legacy_compression_methods", (rr, e) => [...rr.b.subarray(rr.p, e)].map((m) => (m === 0 ? "null (0)" : String(m))).join(", "), { go: S + "clientHelloMsg.compressionMethods" }));
   if (r.left > 0) out.push(extensionsBlock(r, "ch", ctx));
@@ -374,16 +375,19 @@ function serverHello(r: Reader, ctx: DissectCtx): Field[] {
   const hrr = random === hrrRandom;
   const tail = random.slice(48);
   const rf: Field = { name: "random", start: s, end: r.p, value: random, go: S + "serverHelloMsg.random", rfc: [8446, "4.1.3"] };
-  if (hrr) rf.note = "固定值 SHA-256(\"HelloRetryRequest\")：这条 ServerHello 其实是 HelloRetryRequest。";
+  if (hrr) rf.note = tx('Fixed value SHA-256("HelloRetryRequest"): this ServerHello is a HelloRetryRequest.', '固定值 SHA-256("HelloRetryRequest")：这条 ServerHello 其实是 HelloRetryRequest。');
   else if (tail === downgradeTLS12 || tail === downgradeTLS11) {
-    rf.note = `末尾 8 字节是降级哨兵 "DOWNGRD\\x0${tail === downgradeTLS12 ? 1 : 0}"：服务器支持 TLS 1.3，却协商了更低的版本。`;
+    rf.note = tx(
+      `The last 8 bytes are the downgrade sentinel "DOWNGRD\\x0${tail === downgradeTLS12 ? 1 : 0}": the server supports TLS 1.3 and negotiated a lower version.`,
+      `末尾 8 字节是降级哨兵 "DOWNGRD\\x0${tail === downgradeTLS12 ? 1 : 0}"：服务器支持 TLS 1.3，却协商了更低的版本。`,
+    );
     rf.children = [
-      { name: "随机部分", start: s, end: s + 24, value: random.slice(0, 48) },
-      { name: "降级哨兵", start: s + 24, end: s + 32, value: `${tail} "DOWNGRD\\x0${tail === downgradeTLS12 ? 1 : 0}"`, go: S + "downgradeCanaryTLS12", rfc: [8446, "4.1.3"] },
+      { name: tx("random bytes", "随机部分"), start: s, end: s + 24, value: random.slice(0, 48) },
+      { name: tx("downgrade sentinel", "降级哨兵"), start: s + 24, end: s + 32, value: `${tail} "DOWNGRD\\x0${tail === downgradeTLS12 ? 1 : 0}"`, go: S + "downgradeCanaryTLS12", rfc: [8446, "4.1.3"] },
     ];
   }
   out.push(rf);
-  out.push(vector(r, 1, "legacy_session_id_echo", (rr, e) => (e === rr.p ? "（空）" : rr.hex(rr.p, e)), { go: S + "serverHelloMsg.sessionId" }));
+  out.push(vector(r, 1, "legacy_session_id_echo", (rr, e) => (e === rr.p ? tx("(empty)", "（空）") : rr.hex(rr.p, e)), { go: S + "serverHelloMsg.sessionId" }));
   s = r.p;
   const cs = r.u16();
   out.push({ name: "cipher_suite", start: s, end: r.p, value: `${nameOr(cipherSuites, cs)} (0x${cs.toString(16).padStart(4, "0")})`, go: S + "serverHelloMsg.cipherSuite", rfc: [8446, "B.4"] });
@@ -396,7 +400,7 @@ function serverHello(r: Reader, ctx: DissectCtx): Field[] {
 
 function certificate13(r: Reader, ctx: DissectCtx): Field[] {
   const out: Field[] = [];
-  out.push(vector(r, 1, "certificate_request_context", (rr, e) => (e === rr.p ? "（空：不是对 CertificateRequest 的回应）" : rr.hex(rr.p, e))));
+  out.push(vector(r, 1, "certificate_request_context", (rr, e) => (e === rr.p ? tx("(empty: not a reply to CertificateRequest)", "（空：不是对 CertificateRequest 的回应）") : rr.hex(rr.p, e))));
   out.push(
     vector(r, 3, "certificate_list", (rr, e) => {
       const list: Field[] = [];
@@ -423,7 +427,7 @@ function certData(r: Reader, ctx: DissectCtx, i: number): Field {
   const der = hexOf(r.b, start + 3, r.p, 1 << 20);
   const ci = ctx.certs?.findIndex((c) => c.der === der) ?? -1;
   const subj = f.children?.[1]?.children?.find((c) => c.name === "subject")?.value;
-  f.value = subj ? subj.replace(/^.*CN=/, "CN=") : `证书 ${i}`;
+  f.value = subj ? subj.replace(/^.*CN=/, "CN=") : tx(`certificate ${i}`, `证书 ${i}`);
   if (ci >= 0) f.cert = ci;
   return f;
 }
@@ -452,16 +456,16 @@ function newSessionTicket(r: Reader, ctx: DissectCtx): Field[] {
   const out: Field[] = [];
   let s = r.p;
   const life = r.u32();
-  out.push({ name: "ticket_lifetime", start: s, end: r.p, value: `${life} 秒（${(life / 86400).toFixed(1)} 天）`, go: S + "newSessionTicketMsgTLS13.lifetime", rfc: [8446, "4.6.1"] });
+  out.push({ name: "ticket_lifetime", start: s, end: r.p, value: tx(`${life} s (${(life / 86400).toFixed(1)} days)`, `${life} 秒（${(life / 86400).toFixed(1)} 天）`), go: S + "newSessionTicketMsgTLS13.lifetime", rfc: [8446, "4.6.1"] });
   if (ctx.version === 0x0304) {
     s = r.p;
     const add = r.u32();
     out.push({ name: "ticket_age_add", start: s, end: r.p, value: `0x${add.toString(16)}`, go: S + "newSessionTicketMsgTLS13.ageAdd" });
     out.push(vector(r, 1, "ticket_nonce", (rr, e) => rr.hex(rr.p, e), { go: S + "newSessionTicketMsgTLS13.nonce" }));
-    out.push(vector(r, 2, "ticket", (rr, e) => `${e - rr.p} 字节，服务器用票据密钥加密的会话状态`, { go: S + "newSessionTicketMsgTLS13.label" }));
+    out.push(vector(r, 2, "ticket", (rr, e) => tx(`${e - rr.p} bytes, session state encrypted under the ticket key`, `${e - rr.p} 字节，服务器用票据密钥加密的会话状态`), { go: S + "newSessionTicketMsgTLS13.label" }));
     out.push(extensionsBlock(r, "nst", ctx));
   } else {
-    out.push(vector(r, 2, "ticket", (rr, e) => `${e - rr.p} 字节`, { go: S + "newSessionTicketMsg.ticket", rfc: [5077, "3.3"] }));
+    out.push(vector(r, 2, "ticket", (rr, e) => tx(`${e - rr.p} bytes`, `${e - rr.p} 字节`), { go: S + "newSessionTicketMsg.ticket", rfc: [5077, "3.3"] }));
   }
   return out;
 }
@@ -473,20 +477,20 @@ function serverKeyExchange(r: Reader): Field[] {
   let p = r.p;
   const g = r.u16();
   out.push({ name: "named_curve", start: p, end: r.p, value: nameOr(groups, g) });
-  out.push(vector(r, 1, "public", (rr, e) => rr.hex(rr.p, e), { note: "服务器的临时 ECDHE 公钥" }));
+  out.push(vector(r, 1, "public", (rr, e) => rr.hex(rr.p, e), { note: tx("the server's ephemeral ECDHE public key", "服务器的临时 ECDHE 公钥") }));
   p = r.p;
   const a = r.u16();
   out.push({ name: "signature_algorithm", start: p, end: r.p, value: nameOr(sigSchemes, a) });
-  out.push(vector(r, 2, "signature", (rr, e) => rr.hex(rr.p, e), { note: "签名覆盖 client_random ‖ server_random ‖ 上面的参数" }));
-  return [{ name: "ServerECDHParams + 签名", start: s, end: r.p, go: S + "serverKeyExchangeMsg.key", children: out }];
+  out.push(vector(r, 2, "signature", (rr, e) => rr.hex(rr.p, e), { note: tx("the signature covers client_random ‖ server_random ‖ the parameters above", "签名覆盖 client_random ‖ server_random ‖ 上面的参数") }));
+  return [{ name: tx("ServerECDHParams + signature", "ServerECDHParams + 签名"), start: s, end: r.p, go: S + "serverKeyExchangeMsg.key", children: out }];
 }
 
 function clientKeyExchange(r: Reader, end: number): Field[] {
   const n = end - r.p;
   if (n > 0 && r.b[r.p] === n - 1) {
-    return [vector(r, 1, "ecdh_Yc", (rr, e) => rr.hex(rr.p, e), { go: S + "clientKeyExchangeMsg.ciphertext", rfc: [8422, "5.7"], note: "客户端的临时 ECDHE 公钥" })];
+    return [vector(r, 1, "ecdh_Yc", (rr, e) => rr.hex(rr.p, e), { go: S + "clientKeyExchangeMsg.ciphertext", rfc: [8422, "5.7"], note: tx("the client's ephemeral ECDHE public key", "客户端的临时 ECDHE 公钥") })];
   }
-  return [vector(r, 2, "EncryptedPreMasterSecret", (rr, e) => rr.hex(rr.p, e), { go: S + "clientKeyExchangeMsg.ciphertext", rfc: [5246, "7.4.7.1"], note: "用服务器 RSA 公钥加密的 48 字节预主密钥" })];
+  return [vector(r, 2, "EncryptedPreMasterSecret", (rr, e) => rr.hex(rr.p, e), { go: S + "clientKeyExchangeMsg.ciphertext", rfc: [5246, "7.4.7.1"], note: tx("48-byte premaster secret encrypted to the server's RSA public key", "用服务器 RSA 公钥加密的 48 字节预主密钥") })];
 }
 
 /** Dissects one handshake message, header included. */
@@ -541,7 +545,7 @@ export function dissect(data: Uint8Array, ctx: DissectCtx): Field[] {
     }
     return [...out, ...body];
   } catch (e) {
-    return [...out, { name: "解析失败", start: r.p, end: data.length, value: String(e) }];
+    return [...out, { name: tx("parse failed", "解析失败"), start: r.p, end: data.length, value: String(e) }];
   }
 }
 

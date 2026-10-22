@@ -1,5 +1,6 @@
 // A small DER walker that labels the parts of an X.509 certificate, enough to
 // line bytes in the hex view up with RFC 5280 field names.
+import { tx } from "../i18n/lang";
 import type { Field } from "./dissect";
 
 const oids: Record<string, string> = {
@@ -85,7 +86,7 @@ function text(b: Uint8Array, t: TLV): string {
 function hex(b: Uint8Array, t: TLV, max = 24): string {
   const v = b.subarray(t.start + t.hdr, t.end);
   const s = [...v.subarray(0, max)].map((x) => x.toString(16).padStart(2, "0")).join("");
-  return v.length > max ? `${s}… (${v.length} 字节)` : s;
+  return v.length > max ? `${s}… (${v.length} ${tx("bytes", "字节")})` : s;
 }
 
 function time(b: Uint8Array, t: TLV): string {

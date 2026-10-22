@@ -5,6 +5,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { buildModel } from "../src/capture/model";
 import type { Capture, CodeFile, NoteIndexEntry, RfcIndexEntry, SymbolsFile } from "../src/data/types";
+import { historyFor, scenariosFor } from "../src/i18n/content";
+import { zhHistory, zhScenarios } from "../src/i18n/zhContent";
 import { scenarioDefs } from "../src/scenarios";
 import { resolveSteps } from "../src/scenarios/resolve";
 
@@ -14,6 +16,7 @@ const json = <T>(p: string): T => JSON.parse(readFileSync(data + p, "utf8")) as 
 const symbols = json<SymbolsFile>("code/symbols.json");
 const byKey = new Map(symbols.symbols.map((s) => [s.k, s]));
 const notes = json<NoteIndexEntry[]>("notes/index.json");
+const notesZh = json<NoteIndexEntry[]>("notes/zh/index.json");
 const rfcs = json<RfcIndexEntry[]>("rfc/index.json");
 
 function lineOf(fn: string, find: string): number {
@@ -30,6 +33,10 @@ for (const def of scenarioDefs) {
     const cap = json<Capture>(`captures/${def.id}.json`);
     const model = buildModel(cap);
     const { steps, errors } = resolveSteps(model, def);
+
+    it("keeps generated presentation metadata in step with the English definition", () => {
+      expect({ title: cap.title, brief: cap.brief }).toEqual({ title: def.title, brief: def.brief });
+    });
 
     it("resolves every anchor in order", () => {
       expect(errors).toEqual([]);
@@ -97,6 +104,49 @@ describe("history", async () => {
         if (sec) expect(doc!.sections.map((x) => x.id)).toContain(sec);
       }
       expect(`${e.title}${e.problem}${e.fix ?? ""}${e.go ?? ""}`).not.toMatch(/[–—]/);
+    });
+  }
+});
+
+describe("chinese edition", () => {
+  it("covers every scenario and step without an English fallback", () => {
+    expect(Object.keys(zhScenarios)).toEqual(scenarioDefs.map((def) => def.id));
+    for (const def of scenarioDefs) {
+      const localized = zhScenarios[def.id as keyof typeof zhScenarios];
+      expect(Object.keys(localized.steps)).toEqual(def.steps.map((step) => step.id));
+      const rendered = scenariosFor("zh").find((scenario) => scenario.id === def.id)!;
+      expect(rendered.title).toBeTruthy();
+      expect(rendered.brief).not.toBe(def.brief);
+    }
+  });
+
+  it("covers every history entry and code label without an English fallback", () => {
+    const english = historyFor("en").entries;
+    expect(Object.keys(zhHistory.entries).sort()).toEqual(english.map((entry) => entry.id).sort());
+    for (const entry of english) {
+      const localized = zhHistory.entries[entry.id as keyof typeof zhHistory.entries];
+      expect(localized.labels).toHaveLength(entry.code?.length ?? 0);
+    }
+  });
+
+  for (const def of scenariosFor("zh")) {
+    for (const s of def.steps) {
+      for (const r of s.refs ?? []) {
+        if (!("note" in r) || !r.h) continue;
+        it(`${def.id}/${s.id} cites ${r.note}#${r.h}`, () => {
+          const n = notesZh.find((x) => x.id === r.note);
+          expect(n, `note ${r.note}`).toBeTruthy();
+          expect(n!.headings.map((h) => h.anchor)).toContain(r.h);
+        });
+      }
+    }
+  }
+  for (const e of historyFor("zh").entries) {
+    if (!e.note?.[1]) continue;
+    it(`history ${e.id} cites ${e.note[0]}#${e.note[1]}`, () => {
+      const n = notesZh.find((x) => x.id === e.note![0]);
+      expect(n).toBeTruthy();
+      expect(n!.headings.map((h) => h.anchor)).toContain(e.note![1]);
     });
   }
 });

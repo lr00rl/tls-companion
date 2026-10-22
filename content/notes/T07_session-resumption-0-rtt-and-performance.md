@@ -6,7 +6,7 @@ status: done
 
 # T07 · 会话恢复、0-RTT 与握手性能优化
 
-> 系列：[[00_TLS系列总览与学习路线|TLS 系列总览]] · 上一篇：[[T06_TLS13握手与密钥调度逐包拆解|T06 TLS 1.3 握手与密钥调度]] · 下一篇：[[T08_ECH与HTTPS记录_握手里的隐私|T08 ECH 与 HTTPS 记录]]
+> 系列：[[00_tls-series-overview|TLS 系列总览]] · 上一篇：[[T06_tls13-handshake-and-key-schedule|T06 TLS 1.3 握手与密钥调度]] · 下一篇：[[T08_ech-and-https-record-privacy|T08 ECH 与 HTTPS 记录]]
 > 前置知识：T01 的往返账，T05 的 TLS 1.2 会话恢复，T06 的密钥调度和 NewSessionTicket。
 > 主要标准：RFC 5077（会话票据）、RFC 8446（§2.2、§2.3、§4.2.10、§4.2.11、§8）、RFC 8470（HTTP 中的早期数据）、RFC 7918（False Start）、RFC 7413（TCP Fast Open）、RFC 6928（初始拥塞窗口）、RFC 8879（证书压缩）、RFC 9113 §9.1.1（连接复用）、RFC 8336（ORIGIN 帧）、RFC 8297（103 Early Hints）
 > 整理日期：2026-10-16（文中恢复与 0-RTT 实验为 2026-10-17 03:04 UTC 用 OpenSSL 4.0.3 对公开网站的实测）
@@ -57,7 +57,7 @@ pre_shared_key 扩展（ClientHello 中必须是最后一个扩展）
 
 binder 证明客户端确实持有这个 PSK，并把 PSK 和这一条具体的 ClientHello 绑定在一起：binder_key 从 Early Secret 派生（T06 推导树里的 `res binder`），再按 Finished 的方式算 HMAC，HMAC 的输入是去掉 binders 列表之后的 ClientHello。攻击者拿到一张票据，没有对应的 PSK 就算不出 binder；把 binder 挪到另一条 ClientHello 上也对不上。pre_shared_key 必须是最后一个扩展，正是因为 binder 要覆盖它之前的全部内容。
 
-obfuscated_ticket_age 让服务器检查票据的"年龄"是否合理（用于 0-RTT 的新鲜度检查），又不让路径上的观察者看到真实年龄：每张票据有自己随机的 ticket_age_add，观察者无法通过年龄把同一个用户的两次连接关联起来。票据有效期最长 7 天（§4.6.1）。
+obfuscated_ticket_age 让服务器检查票据的"年龄"是否合理（用于 0-RTT 的新鲜度检查），又不让路径上的观察者看到真实年龄。每张票据都有随机的 ticket_age_add，用来混淆其数值年龄；如果复用同一张票据，票据身份本身仍可能让观察者关联连接。票据有效期最长 7 天（§4.6.1）。
 
 psk_key_exchange_modes 扩展规定恢复时怎么用 PSK。`psk_ke` 只用 PSK，不做 DH，计算最省，但会话密钥完全依赖 PSK，没有前向保密；`psk_dhe_ke` 在 PSK 之外再做一次 (EC)DHE，PSK 进入 Early Secret，DH 共享秘密进入 Handshake Secret，即使票据密钥日后泄露，恢复出的会话仍然安全。T06 里 OpenSSL 只提供了 `psk_dhe_ke`，浏览器也普遍只用这种模式。
 
@@ -86,7 +86,7 @@ sequenceDiagram
 | www.facebook.com | Reused，TLS_CHACHA20_POLY1305_SHA256 | 4294967295 字节（0xFFFFFFFF） |
 | www.apple.com | Reused，TLS_AES_256_GCM_SHA384 | 0 |
 
-最后一列来自票据里的 early_data 扩展（max_early_data_size），是服务器愿意接受的 0-RTT 数据上限，0 表示不接受 0-RTT。Facebook 的 0xFFFFFFFF 是协议允许的最大值，相当于不设上限，它的 TLS 栈来自 Meta 自研的 Fizz（见 [[T11_各大厂的TLS工程实践|T11]]）。
+最后一列来自票据里的 early_data 扩展（max_early_data_size），是服务器愿意接受的 0-RTT 数据上限，0 表示不接受 0-RTT。Facebook 的 0xFFFFFFFF 是协议的 uint32 最大值，约 4 GiB：它表示一个非常大的广告上限，不是真正的无上限。它的 TLS 栈来自 Meta 自研的 Fizz（见 [[T11_tls-engineering-practices|T11]]）。
 
 ## 0-RTT：让请求和握手一起出发
 
@@ -126,20 +126,22 @@ HTTP/1.1 200 OK
 
 第一个代价是重放（replay）。早期数据只用 PSK 加密，在服务器回复之前就已发出，服务器无法通过任何新鲜的交互确认它不是被录下来再次发送的。路径上的攻击者可以把这条 ClientHello 连同早期数据原样再发一次，甚至发到同一集群的另一台服务器上。如果早期数据是"转账 100 元"，重放就意味着转两次。
 
-RFC 8446 §8 给了三种服务器端的防护，都不完美：单次使用的票据（服务器记住哪些票据已经用过，分布式集群里要全局同步才严格）；记录见过的 ClientHello（同样需要在集群内共享，并限定一个时间窗口）；新鲜度检查（用 obfuscated_ticket_age 估算票据年龄，和服务器自己记录的签发时间对比，拒绝明显太旧的请求，但只能缩小窗口不能消除重放）。规范因此要求使用 0-RTT 的应用协议必须自己定义哪些数据可以作为早期数据发送。服务器决定是否接受一份早期数据，可以理解为下面这一串检查，任何一步不通过就拒绝早期数据，退回普通的 1-RTT 握手（客户端在握手完成后重发请求）：
+RFC 8446 §8 给了三种服务器端的防护，都不完美：单次使用的票据（服务器记住哪些票据已经用过，分布式集群里要全局同步才严格）；记录见过的 ClientHello（同样需要在集群内共享，并限定一个时间窗口）；新鲜度检查（用 obfuscated_ticket_age 估算票据年龄，和服务器自己记录的签发时间对比，拒绝明显太旧的请求，但只能缩小窗口不能消除重放）。规范因此要求使用 0-RTT 的应用协议必须自己定义哪些数据可以作为早期数据发送。如果没有选中可接受的 PSK，服务器可以拒绝早期数据，并在可能时继续非 PSK 握手。如果服务器已选中 PSK，对应 binder 缺失或无效必须中止握手，不能当作拒绝早期数据后的降级路径。其余早期数据检查失败时，PSK 握手可继续：
 
 ```mermaid
 flowchart TD
-    A["收到 ClientHello，带 early_data 与 pre_shared_key"] --> B{"票据能解开，binder 正确？"}
-    B -- 否 --> X["拒绝早期数据，按完整握手或普通 PSK 继续"]
-    B -- 是 --> C{"票据允许早期数据？<br/>max_early_data_size 大于 0"}
-    C -- 否 --> X
+    A["收到 ClientHello，带 early_data 与 pre_shared_key"] --> B{"有可接受的 PSK 票据？"}
+    B -- 否 --> X["拒绝早期数据；如果可能，继续非 PSK 握手"]
+    B -- 是 --> V{"对应的 binder 校验成功？"}
+    V -- 否 --> Z["中止握手"]
+    V -- 是 --> C{"票据允许早期数据？<br/>max_early_data_size 大于 0"}
+    C -- 否 --> Y["拒绝早期数据；继续 PSK 握手"]
     C -- 是 --> D{"新鲜度：报告的票据年龄与签发时间吻合？"}
-    D -- 否 --> X
+    D -- 否 --> Y
     D -- 是 --> E{"这张票据或这个 ClientHello 在时间窗口内没见过？<br/>单次使用或 ClientHello 记录"}
-    E -- 否 --> X
+    E -- 否 --> Y
     E -- 是 --> F{"应用层：这个请求能承受重放吗？<br/>HTTP 中可回 425 Too Early"}
-    F -- 否 --> X
+    F -- 否 --> Y
     F -- 是 --> G["接受早期数据，在 EncryptedExtensions 中回 early_data"]
 ```
 
@@ -155,13 +157,13 @@ flowchart TD
 
 TLS False Start（RFC 7918）是 TLS 1.2 的优化：客户端发出自己的 Finished 之后，不等服务器的 Finished，就开始发应用数据。完整握手的有效延迟因此从两个往返降到一个，和 TLS 1.3 相当。风险在于此时客户端还没有确认握手未被篡改，如果中间人把握手降级到一个可以实时破解的算法，客户端最早的那批数据就已经落到攻击者手里。所以 RFC 7918 只允许在使用前向保密的密钥交换和足够强的算法时 False Start，浏览器在 TLS 1.2 时代普遍启用了它。TLS 1.3 的 1-RTT 握手让它失去了意义。
 
-TCP Fast Open（RFC 7413）让 TCP 的 SYN 携带数据：客户端第一次连接时向服务器要一个 cookie，之后的连接在 SYN 里带上 cookie 和数据（可以是 ClientHello），服务器验证 cookie 后可以在握手完成前就把数据交给应用。理论上它能把 TCP 加 TLS 1.3 加 0-RTT 的首字节压到一个往返。实际部署很少，原因有几个：不少中间设备会丢弃或篡改带数据的 SYN；SYN 里的数据和 0-RTT 一样可能被重放，要靠应用自己处理；cookie 可以被用来跟踪客户端。QUIC 在 UDP 上自己实现了 0-RTT 的建连，在很大程度上取代了 TCP Fast Open 想做的事（[[T09_QUIC与HTTP3_把TLS放进传输层|T09]]）。
+TCP Fast Open（RFC 7413）让 TCP 的 SYN 携带数据：客户端第一次连接时向服务器要一个 cookie，之后的连接在 SYN 里带上 cookie 和数据（可以是 ClientHello），服务器验证 cookie 后可以在握手完成前就把数据交给应用。理论上它能把 TCP 加 TLS 1.3 加 0-RTT 的首字节压到一个往返。实际部署很少，原因有几个：不少中间设备会丢弃或篡改带数据的 SYN；SYN 里的数据和 0-RTT 一样可能被重放，要靠应用自己处理；cookie 可以被用来跟踪客户端。QUIC 在 UDP 上自己实现了 0-RTT 的建连，在很大程度上取代了 TCP Fast Open 想做的事（[[T09_quic-and-http3|T09]]）。
 
 ## 字节：别让握手多出一个往返
 
 TCP 的慢启动规定，连接刚建立时发送方只能发出初始拥塞窗口那么多数据，然后等待 ACK 才能继续。RFC 6928 把初始窗口定为 10 个报文段，以 1460 字节的 MSS 计约 14KB。服务器的第一组回复（ServerHello、EncryptedExtensions、Certificate、CertificateVerify、Finished）如果超过这个大小，服务器发到一半就要停下等客户端的 ACK，凭空多出一个往返。
 
-所以握手的字节数直接影响延迟。几个实测的数字：www.cloudflare.com 的 Certificate 消息是 2522 字节（含 4 字节握手头），www.google.com 的是 2477 字节，T03 里 letsencrypt.org 的四张证书一共 3576 字节，它们都是 ECDSA 证书链。混合后量子密钥交换让 ServerHello 增加了约 1.1KB（1120 字节的 key_share），加上证书链和签名，服务器第一组回复的总量对这几个网站来说大约在 4KB 上下，离 14KB 还有余量。容易超标的是带 RSA-4096 证书、多级中间证书、还钉了 OCSP 响应的老式配置，以及将来的后量子签名证书（[[T10_后量子TLS_ML-KEM混合密钥交换与MTC|T10]]）。
+所以握手的字节数直接影响延迟。几个实测的数字：www.cloudflare.com 的 Certificate 消息是 2522 字节（含 4 字节握手头），www.google.com 的是 2477 字节，T03 里 letsencrypt.org 的四张证书一共 3576 字节，它们都是 ECDSA 证书链。混合后量子密钥交换让 ServerHello 增加了约 1.1KB（1120 字节的 key_share），加上证书链和签名，服务器第一组回复的总量对这几个网站来说大约在 4KB 上下，离 14KB 还有余量。容易超标的是带 RSA-4096 证书、多级中间证书、还钉了 OCSP 响应的老式配置，以及将来的后量子签名证书（[[T10_post-quantum-tls|T10]]）。
 
 减小握手体积的手段有三种。用 ECDSA 证书代替 RSA 证书，公钥和签名都小得多（T03）。只发必要的中间证书，不发根证书。证书压缩（RFC 8879）：TLS 1.3 定义了 compress_certificate 扩展和 CompressedCertificate 消息，支持 zlib、brotli、zstd 三种算法，客户端声明支持哪些，服务器就可以把整个 Certificate 消息压缩后发送；证书里有大量重复的结构和名字，压缩效果可观。Chrome 和 Cloudflare 都支持 brotli 证书压缩。本机的 OpenSSL 4.0.3 构建没有链接这几个压缩库（`openssl version -a` 未列出），ClientHello 里没有声明支持，所以实测拿到的都是未压缩的证书，这里没有本机测得的压缩比可报。
 

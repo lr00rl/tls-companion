@@ -1,8 +1,8 @@
 import { useMemo, useRef } from "react";
 import { useWB } from "../app/store";
-import { useLoad, load } from "../data/load";
 import { EV_WRITE } from "../data/types";
-import { scenarioDefs } from "../scenarios";
+import { scenariosFor } from "../i18n/content";
+import { useLang, useTx } from "../i18n/lang";
 import { navigate } from "../app/route";
 import { useMedia } from "../ui/hooks";
 import { useSize } from "./clock";
@@ -25,8 +25,8 @@ export function Transport() {
   const rttMs = useWB((s) => s.rttMs);
   const scenario = useWB((s) => s.scenario);
   const wb = useWB.getState;
-  const index = useLoad("captures", load.captures);
-  const titles = new Map(index.state === "ready" ? index.data.map((c) => [c.id, c.title]) : []);
+  const t = useTx();
+  const defs = scenariosFor(useLang());
   // Full names do not fit beside the controls on a phone.
   const narrow = useMedia("(max-width: 600px)");
 
@@ -35,21 +35,21 @@ export function Transport() {
     <div className="transport">
       <div className="transport-row">
         <label className="scenario-pick">
-          <span className="sr-only">场景</span>
+          <span className="sr-only">{t("Scenario", "场景")}</span>
           <select
             value={scenario ?? ""}
             onChange={(e) => navigate({ page: "play", scenario: e.target.value, step: 0 })}
           >
-            {scenarioDefs.map((d) => (
+            {defs.map((d) => (
               <option key={d.id} value={d.id}>
-                {narrow ? d.short : (titles.get(d.id) ?? d.id)}
+                {narrow ? d.short : d.title}
               </option>
             ))}
           </select>
         </label>
         <div className="controls">
-          <button className="btn" onClick={() => wb().goStep(step - 1)} disabled={step <= 0} title="上一步（←）" aria-label="上一步">
-            <svg viewBox="0 0 16 16">{Icon.prev}</svg>
+          <button className="btn" onClick={() => wb().goStep(step - 1)} disabled={step <= 0} title={t("Previous step (Left)", "上一步（←）")} aria-label={t("Previous step", "上一步")}>
+            <svg viewBox="0 0 16 16" aria-hidden>{Icon.prev}</svg>
           </button>
           <button
             className="btn play"
@@ -57,31 +57,31 @@ export function Transport() {
               if (!playing && step >= steps.length - 1) wb().goStep(0);
               wb().setPlaying(!playing);
             }}
-            title="播放 / 暂停（空格）"
-            aria-label={playing ? "暂停" : "播放"}
+            title={t("Play or pause (Space)", "播放 / 暂停（空格）")}
+            aria-label={playing ? t("Pause", "暂停") : t("Play", "播放")}
             aria-pressed={playing}
           >
-            <svg viewBox="0 0 16 16">{playing ? Icon.pause : Icon.play}</svg>
+            <svg viewBox="0 0 16 16" aria-hidden>{playing ? Icon.pause : Icon.play}</svg>
           </button>
-          <button className="btn" onClick={() => wb().goStep(step + 1)} disabled={step >= steps.length - 1} title="下一步（→）" aria-label="下一步">
-            <svg viewBox="0 0 16 16">{Icon.next}</svg>
+          <button className="btn" onClick={() => wb().goStep(step + 1)} disabled={step >= steps.length - 1} title={t("Next step (Right)", "下一步（→）")} aria-label={t("Next step", "下一步")}>
+            <svg viewBox="0 0 16 16" aria-hidden>{Icon.next}</svg>
           </button>
         </div>
         <div className="step-title">
           <span className="num step-count">
             {steps.length ? step + 1 : 0}/{steps.length}
           </span>
-          <span className="step-name">{cur?.title ?? "加载中"}</span>
+          <span className="step-name">{cur?.title ?? t("Loading", "加载中")}</span>
         </div>
         <span className="spacer" />
-        <div className="seg-ctl hide-md" role="group" aria-label="播放速度">
+        <div className="seg-ctl hide-md" role="group" aria-label={t("Playback speed", "播放速度")}>
           {[0.5, 1, 2].map((v) => (
             <button key={v} className="btn" aria-pressed={speed === v} onClick={() => wb().setSpeed(v)}>
               {v}×
             </button>
           ))}
         </div>
-        <label className="rtt hide-md" title="往返时延只影响时序图上的毫秒数">
+        <label className="rtt hide-md" title={t("Round-trip time only changes the milliseconds on the diagram", "往返时延只影响时序图上的毫秒数")}>
           RTT
           <select value={rttMs} onChange={(e) => wb().setRtt(Number(e.target.value))}>
             {[10, 40, 80, 150, 300].map((v) => (
@@ -95,8 +95,8 @@ export function Transport() {
       {model && (
         <div className="scrub-row">
           <div className="scrub-legend" aria-hidden>
-            <span className="c">客户端</span>
-            <span className="s">服务器</span>
+            <span className="c">{t("Client", "客户端")}</span>
+            <span className="s">{t("Server", "服务器")}</span>
           </div>
           <Scrubber cursor={cursor} />
         </div>
@@ -106,6 +106,7 @@ export function Transport() {
 }
 
 function Scrubber({ cursor }: { cursor: number }) {
+  const t = useTx();
   const model = useWB((s) => s.model)!;
   const steps = useWB((s) => s.steps);
   const step = useWB((s) => s.step);
@@ -143,11 +144,11 @@ function Scrubber({ cursor }: { cursor: number }) {
       className="scrubber"
       role="slider"
       tabIndex={0}
-      aria-label="事件时间轴"
+      aria-label={t("Event timeline", "事件时间轴")}
       aria-valuemin={0}
       aria-valuemax={n - 1}
       aria-valuenow={cursor}
-      aria-valuetext={`第 ${cursor} 个事件，步骤 ${step + 1}`}
+      aria-valuetext={t(`Event ${cursor}, step ${step + 1}`, `第 ${cursor} 个事件，步骤 ${step + 1}`)}
       onPointerDown={(e) => {
         e.currentTarget.setPointerCapture(e.pointerId);
         byPointer.current = true;

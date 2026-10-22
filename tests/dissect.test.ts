@@ -26,7 +26,7 @@ for (const def of scenarioDefs) {
         const fields = dissect(bytes, { version: model.version, certs: cap.certs });
         let failed = false;
         walk(fields, (f) => {
-          if (f.name === "解析失败") failed = true;
+          if (f.name === "parse failed") failed = true;
           expect(f.start).toBeLessThanOrEqual(f.end);
           expect(f.end).toBeLessThanOrEqual(bytes.length);
         });
@@ -41,12 +41,12 @@ it("labels the TLS 1.2 downgrade sentinel and the hybrid key share", () => {
   const cap = JSON.parse(readFileSync(`${data}tls12-ecdhe.json`, "utf8")) as Capture;
   const sh = dissect(hexBytes(cap.messages[1].data), { version: 0x0303 });
   const random = sh.find((f) => f.name === "random")!;
-  expect(random.children?.[1].name).toBe("降级哨兵");
+  expect(random.children?.[1].name).toBe("downgrade sentinel");
   const full = JSON.parse(readFileSync(`${data}tls13-full.json`, "utf8")) as Capture;
   const ch = dissect(hexBytes(full.messages[0].data), { version: 0x0304 });
   const names: string[] = [];
   walk(ch, (f) => names.push(f.name));
-  expect(names).toContain("ML-KEM-768 封装密钥");
+  expect(names).toContain("ML-KEM-768 encapsulation key");
   const cert = dissect(hexBytes(full.messages.find((m) => m.type === 11)!.data), { version: 0x0304, certs: full.certs });
   const entries: Field[] = [];
   walk(cert, (f) => f.cert !== undefined && f.name === "cert_data" && entries.push(f));

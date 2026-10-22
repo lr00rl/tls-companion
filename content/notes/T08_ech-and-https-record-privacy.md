@@ -6,7 +6,7 @@ status: done
 
 # T08 · ECH 与 HTTPS 记录：握手里的隐私
 
-> 系列：[[00_TLS系列总览与学习路线|TLS 系列总览]] · 上一篇：[[T07_会话恢复_0-RTT与握手性能优化|T07 会话恢复与 0-RTT]] · 下一篇：[[T09_QUIC与HTTP3_把TLS放进传输层|T09 QUIC 与 HTTP/3]]
+> 系列：[[00_tls-series-overview|TLS 系列总览]] · 上一篇：[[T07_session-resumption-0-rtt-and-performance|T07 会话恢复与 0-RTT]] · 下一篇：[[T09_quic-and-http3|T09 QUIC 与 HTTP/3]]
 > 前置知识：T06 的 ClientHello 结构和降级哨兵思路，T02 的 AEAD 和 X25519。
 > 主要标准：RFC 9849（TLS Encrypted Client Hello，2026-03）、RFC 9848（用 DNS 服务绑定引导 ECH，2026-03）、RFC 9934（ECH 密钥的 PEM 格式）、RFC 9180（HPKE）、RFC 9460（SVCB 与 HTTPS 记录）、RFC 6066 §3（SNI）、RFC 8484（DoH）、RFC 7858（DoT）、RFC 9250（DoQ）、RFC 8701（GREASE）
 > 整理日期：2026-10-16（文中 HTTPS 记录为 2026-10-17 03:07 UTC 经 1.1.1.1 查询的真实结果）
@@ -149,7 +149,7 @@ sequenceDiagram
 
 ## 填充、GREASE 与匿名集
 
-加密了内容，长度仍然可能泄露信息：`a.com` 和 `a-very-long-name.example.org` 加密后长度不同。ECH 要求客户端对内层 ClientHello 做填充（RFC 9849 §6.1.3）：至少把服务器名填充到 maximum_name_length（未知时按规范给出的默认规则），再把整个内层的长度对齐到 32 字节的倍数，让不同目标的握手看起来一样长。
+加密了内容，长度仍然可能泄露信息：`a.com` 和 `a-very-long-name.example.org` 加密后长度不同。ECH 建议客户端对内层 ClientHello 做填充（RFC 9849 §6.1.3，属于 SHOULD 级别的建议）：至少把服务器名填充到 maximum_name_length（未知时按规范给出的默认规则），再把整个内层的长度对齐到 32 字节的倍数，让不同目标的握手看起来一样长。
 
 GREASE ECH 解决另一个问题：如果只有真正使用 ECH 的客户端才发 encrypted_client_hello 扩展，"使用了 ECH"这件事本身就成了一个信号，网络可以据此区别对待。所以没有 ECH 配置的客户端也会发一个格式完全相同、内容随机的假扩展（RFC 9849 §6.2）。观察者从外层看不出哪些连接真的用了 ECH。T04 和 T06 讲过的 GREASE（RFC 8701）是同一种思想：让不认识的值在网络上常态化，防止僵化。
 

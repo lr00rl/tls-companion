@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { href } from "../app/route";
+import { href, navigate } from "../app/route";
 import { usePeek } from "../app/peek";
 import { load, NotFoundError, useLoad } from "../data/load";
 import type { Note } from "../data/types";
-import { scenarioDefs } from "../scenarios";
+import { localizedNoteAnchor, scenariosFor } from "../i18n/content";
+import { useLang, useTx } from "../i18n/lang";
 import { useMedia } from "../ui/hooks";
 import "./pages.css";
 import "./notes.css";
@@ -16,9 +17,9 @@ interface StepLink {
 }
 
 /** Steps that cite a note, keyed by heading anchor ("" for the whole note). */
-function stepLinks(noteId: string): Map<string, StepLink[]> {
+function stepLinks(noteId: string, lang: "en" | "zh"): Map<string, StepLink[]> {
   const m = new Map<string, StepLink[]>();
-  for (const d of scenarioDefs) {
+  for (const d of scenariosFor(lang)) {
     d.steps.forEach((s, i) => {
       for (const r of s.refs ?? []) {
         if (!("note" in r) || r.note !== noteId) continue;
@@ -32,16 +33,19 @@ function stepLinks(noteId: string): Map<string, StepLink[]> {
 }
 
 export default function NotesPage({ id, anchor }: { id?: string; anchor?: string }) {
-  const index = useLoad("notes", load.notes);
-  const captures = useLoad("captures", load.captures);
+  const lang = useLang();
+  const t = useTx();
+  const index = useLoad(`notes:${lang}`, () => load.notes(lang));
+  const enIndex = useLoad("notes:en", () => load.notes("en"));
+  const zhIndex = useLoad("notes:zh", () => load.notes("zh"));
   const noteId = id ?? "00";
-  const note = useLoad(`note:${noteId}`, () => load.note(noteId));
+  const note = useLoad(`note:${lang}:${noteId}`, () => load.note(noteId, lang));
   const wide = useMedia("(min-width: 1180px)");
   const [toc, setToc] = useState(false);
   const [active, setActive] = useState<string>("");
   const article = useRef<HTMLDivElement>(null);
-  const links = useMemo(() => stepLinks(noteId), [noteId]);
-  const scenarioTitle = (sid: string) => (captures.state === "ready" ? captures.data.find((c) => c.id === sid)?.title : sid) ?? sid;
+  const links = useMemo(() => stepLinks(noteId, lang), [noteId, lang]);
+  const scenarioTitle = (sid: string) => scenariosFor(lang).find((d) => d.id === sid)?.title ?? sid;
 
   // Put workbench links under cited headings. Scenario titles arrive with the
   // captures index, which may load after the note, so existing boxes are
@@ -60,13 +64,13 @@ export default function NotesPage({ id, anchor }: { id?: string; anchor?: string
         head.after(box);
       }
       box.innerHTML =
-        `<span>在工作台里看：</span>` +
+        `<span>${t("In the workbench:", "在工作台里看：")}</span>` +
         ls
           .map((l) => `<a href="${href({ page: "play", scenario: l.scenario, step: l.step })}">${escape(scenarioTitle(l.scenario))} · ${l.step + 1} ${escape(l.title)}</a>`)
           .join("");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [note.state, noteId, links, captures.state]);
+  }, [note.state, noteId, links, lang]);
 
   // Draw mermaid and jump to the anchor once per note or anchor, so a late
   // captures load does not pull the reader back to the top.
@@ -83,6 +87,14 @@ export default function NotesPage({ id, anchor }: { id?: string; anchor?: string
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [note.state, noteId, anchor]);
+
+  // A heading anchor belongs to one edition, but URLs do not carry a language.
+  // Accept either edition's anchor and replace it with the active one.
+  useEffect(() => {
+    if (!anchor || enIndex.state !== "ready" || zhIndex.state !== "ready") return;
+    const next = localizedNoteAnchor(noteId, anchor, lang, enIndex.data, zhIndex.data);
+    if (next && next !== anchor) navigate({ page: "notes", id: noteId, anchor: next }, { replace: true });
+  }, [lang, anchor, noteId, enIndex, zhIndex]);
 
   // Scroll spy for the table of contents.
   useEffect(() => {
@@ -112,12 +124,12 @@ export default function NotesPage({ id, anchor }: { id?: string; anchor?: string
   };
 
   const tocNode = index.state === "ready" && (
-    <nav className="notes-toc" aria-label="笔记目录">
+    <nav className="notes-toc" aria-label={t("Note list", "笔记目录")}>
       {index.data.map((n) => (
         <div key={n.id} className={n.id === noteId ? "toc-note cur" : "toc-note"}>
           <a href={href({ page: "notes", id: n.id })} onClick={() => setToc(false)}>
             <span className="num">{n.id}</span>
-            {n.title.replace(/^T\d+ · /, "").replace(/^TLS 系列 · /, "")}
+            {n.title.replace(/^T\d+ · /, "").replace(/^TLS series · /, "").replace(/^TLS 系列 · /, "")}
           </a>
           {n.id === noteId && (
             <ul>
@@ -150,7 +162,7 @@ export default function NotesPage({ id, anchor }: { id?: string; anchor?: string
         {!wide && (
           <div className="notes-bar">
             <button className="btn outline" onClick={() => setToc(true)}>
-              目录
+              {t("Contents", "目录")}
             </button>
           </div>
         )}
@@ -158,22 +170,22 @@ export default function NotesPage({ id, anchor }: { id?: string; anchor?: string
         {note.state === "error" &&
           (note.error instanceof NotFoundError ? (
             <div className="empty">
-              <strong>没有编号为 {noteId} 的笔记</strong>
-              <a href={href({ page: "notes" })}>回到总览与学习路线</a>
+              <strong>{t(`No note numbered ${noteId}`, `没有编号为 ${noteId} 的笔记`)}</strong>
+              <a href={href({ page: "notes" })}>{t("Back to the overview", "回到总览与学习路线")}</a>
             </div>
           ) : (
             <div className="empty">
-              <strong>笔记加载失败</strong>
+              <strong>{t("Could not load the note", "笔记加载失败")}</strong>
               {note.error.message}{" "}
               <button className="btn outline" onClick={note.retry}>
-                重试
+                {t("Retry", "重试")}
               </button>
             </div>
           ))}
         {note.state === "ready" && (
           <article className="note">
             <header>
-              <div className="kicker">{note.data.type === "moc" ? "总览" : note.data.type === "runbook" ? "实验手册" : "笔记"}</div>
+              <div className="kicker">{note.data.type === "moc" ? t("Overview", "总览") : note.data.type === "runbook" ? t("Lab", "实验手册") : t("Note", "笔记")}</div>
               <h1>{note.data.title}</h1>
               <div className="note-tags">
                 {note.data.tags.slice(0, 10).map((t) => (
@@ -192,7 +204,8 @@ export default function NotesPage({ id, anchor }: { id?: string; anchor?: string
 }
 
 function NoteNav({ id }: { id: string }) {
-  const index = useLoad("notes", load.notes);
+  const lang = useLang();
+  const index = useLoad(`notes:${lang}`, () => load.notes(lang));
   if (index.state !== "ready") return null;
   const i = index.data.findIndex((n) => n.id === id);
   const prev = index.data[i - 1];
@@ -206,6 +219,7 @@ function NoteNav({ id }: { id: string }) {
 }
 
 function Related({ note, links, scenarioTitle }: { note: Note; links: Map<string, StepLink[]>; scenarioTitle: (id: string) => string }) {
+  const t = useTx();
   const rfcs = useMemo(() => {
     const m = new Map<number, number>();
     for (const x of note.html.matchAll(/data-rfc="(\d+)"/g)) m.set(Number(x[1]), (m.get(Number(x[1])) ?? 0) + 1);
@@ -214,8 +228,8 @@ function Related({ note, links, scenarioTitle }: { note: Note; links: Map<string
   const all = [...links.values()].flat();
   return (
     <aside className="notes-related">
-      <div className="kicker">工作台中的对应步骤</div>
-      {all.length === 0 && <p className="muted">还没有步骤引用这篇笔记。</p>}
+      <div className="kicker">{t("Steps in the workbench", "工作台中的对应步骤")}</div>
+      {all.length === 0 && <p className="muted">{t("No step cites this note yet.", "还没有步骤引用这篇笔记。")}</p>}
       {[...links.entries()].map(([h, ls]) => (
         <div key={h} className="rel-group">
           {h && (
@@ -234,7 +248,7 @@ function Related({ note, links, scenarioTitle }: { note: Note; links: Map<string
       {rfcs.length > 0 && (
         <>
           <div className="kicker" style={{ marginTop: 18 }}>
-            文中提到的规范
+            {t("RFCs mentioned here", "文中提到的规范")}
           </div>
           <div className="rel-rfcs">
             {rfcs.map(([n, c]) => (

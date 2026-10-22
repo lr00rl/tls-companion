@@ -6,7 +6,7 @@ status: done
 
 # T12 · HTTPS 推广与信任治理
 
-> 系列：[[00_TLS系列总览与学习路线|TLS 系列总览]] · 上一篇：[[T11_各大厂的TLS工程实践|T11 各大厂的 TLS 工程实践]] · 下一篇：[[T13_动手实验_用openssl与curl观察握手|T13 动手实验]]
+> 系列：[[00_tls-series-overview|TLS 系列总览]] · 上一篇：[[T11_tls-engineering-practices|T11 各大厂的 TLS 工程实践]] · 下一篇：[[T13_observing-tls-with-openssl-and-curl|T13 动手实验]]
 > 前置知识：T01 的 HTTP 到 HTTPS 跳转问题，T03 的证书体系、证书透明度与证书寿命。
 > 主要标准：RFC 6797（HSTS）、RFC 7258（普遍监控是一种攻击）、RFC 7469（HPKP，已弃用）、RFC 6698（DANE）、RFC 7672（SMTP 的 DANE）、RFC 8461（MTA-STS）、RFC 9325（BCP 195，TLS 安全使用建议）、RFC 9460 §9.5、CA/B Forum Baseline Requirements
 > 整理日期：2026-10-16（文中 HSTS 头与 preload 状态为 2026-10-17 03:19 UTC 的实测）

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
+import { tx, useLang, useTx } from "../i18n/lang";
 import { executingAt, useWB } from "../app/store";
 import { dominantEpoch, recordLabel, shortFn, type Epoch, type Model } from "../capture/model";
 import type { Side } from "../data/types";
@@ -52,10 +53,10 @@ function layout(model: Model, tcp: boolean) {
   for (const s of model.cap.secrets) {
     let ep: Epoch | null = null;
     let label = "";
-    if (s.op === "Derive-Secret" && s.label === "c hs traffic") [ep, label] = ["hs", "握手密钥"];
-    else if (s.op === "Derive-Secret" && s.label === "c ap traffic") [ep, label] = ["app", "应用密钥"];
-    else if (s.op === "Derive-Secret" && s.label === "c e traffic") [ep, label] = ["early", "0-RTT 密钥"];
-    else if (s.op === "PRF" && s.label === "key expansion") [ep, label] = ["app", "会话密钥"];
+    if (s.op === "Derive-Secret" && s.label === "c hs traffic") [ep, label] = ["hs", tx("handshake keys", "握手密钥")];
+    else if (s.op === "Derive-Secret" && s.label === "c ap traffic") [ep, label] = ["app", tx("application keys", "应用密钥")];
+    else if (s.op === "Derive-Secret" && s.label === "c e traffic") [ep, label] = ["early", tx("0-RTT keys", "0-RTT 密钥")];
+    else if (s.op === "PRF" && s.label === "key expansion") [ep, label] = ["app", tx("session keys", "会话密钥")];
     if (!ep || seen.has(`${s.side}${ep}`)) continue;
     seen.add(`${s.side}${ep}`);
     const t = model.time[s.ev] + off;
@@ -71,6 +72,8 @@ function layout(model: Model, tcp: boolean) {
 }
 
 export function Stage({ tcp }: { tcp: boolean }) {
+  const lang = useLang();
+  const tr = useTx();
   const model = useWB((s) => s.model);
   const cursor = useWB((s) => s.cursor);
   // A key the current step derives counts as present for the whole step, so a
@@ -85,7 +88,7 @@ export function Stage({ tcp }: { tcp: boolean }) {
   const [box, size] = useSize<HTMLDivElement>();
   const scroller = useRef<HTMLDivElement>(null);
 
-  const lay = useMemo(() => (model ? layout(model, tcp) : null), [model, tcp]);
+  const lay = useMemo(() => (model ? layout(model, tcp) : null), [model, tcp, lang]);
   const target = model && lay ? model.time[cursor] + lay.off : 0;
   const t = useEased(target, { msPerUnit: 1400 / speed, maxMs: 1200 / speed, instant: scrubbing });
 
@@ -188,11 +191,11 @@ export function Stage({ tcp }: { tcp: boolean }) {
           </svg>
 
           <div className="endpoint" style={{ left: xC }}>
-            <strong>客户端</strong>
+            <strong>{tr("Client", "客户端")}</strong>
             {!narrow && <span className="mono">{model.cap.addrs[0]}</span>}
           </div>
           <div className="endpoint right" style={{ left: xS }}>
-            <strong>服务器</strong>
+            <strong>{tr("Server", "服务器")}</strong>
             {!narrow && <span className="mono">{model.cap.addrs[1]}</span>}
           </div>
 
@@ -217,7 +220,7 @@ export function Stage({ tcp }: { tcp: boolean }) {
             if (f.tcp)
               return (
                 <div key={f.id} className={`tcp-label${p === 0 ? " future" : ""}`} style={{ left: midX, top: midY }}>
-                  {f.tcp} <span>TCP 示意</span>
+                  {f.tcp} <span>{tr("schematic", "示意")}</span>
                 </div>
               );
             const w = Math.max(f.records.length * 4, f.bytes * bytePx);
@@ -231,7 +234,7 @@ export function Stage({ tcp }: { tcp: boolean }) {
                       className={`plabel ep${selectedRecords.has(ri) ? " sel" : ""}`}
                       data-ep={model.recordEpoch[ri]}
                       onClick={() => selectRecord(ri)}
-                      title={`${labels[k]} · 记录 ${model.cap.records[ri].len + 5} 字节`}
+                      title={tr(`${labels[k]} · record, ${model.cap.records[ri].len + 5} bytes`, `${labels[k]} · 记录 ${model.cap.records[ri].len + 5} 字节`)}
                     >
                       {narrow ? labels[k].replace("EncryptedExtensions", "EE").replace("CertificateVerify", "CV").replace("NewSessionTicket", "NST").replace("ChangeCipherSpec", "CCS") : labels[k].replace("ChangeCipherSpec", "CCS")}
                     </button>
@@ -248,10 +251,10 @@ export function Stage({ tcp }: { tcp: boolean }) {
                       aria-label={labels[f.records.indexOf(ri)]}
                     />
                   ))}
-                  {f.bytes > MSS && <span className="mss" style={{ left: MSS * bytePx }} title="一个 TCP 段装得下的 1460 字节（以太网 MSS）" />}
+                  {f.bytes > MSS && <span className="mss" style={{ left: MSS * bytePx }} title={tr("1460 bytes, one TCP segment on Ethernet (MSS)", "一个 TCP 段装得下的 1460 字节（以太网 MSS）")} />}
                 </div>
                 <div className="packet-bytes num">
-                  {f.bytes} B{f.bytes > MSS ? ` · ${Math.ceil(f.bytes / MSS)} 个 TCP 段` : ""}
+                  {f.bytes} B{f.bytes > MSS ? tr(` · ${Math.ceil(f.bytes / MSS)} TCP segments`, ` · ${Math.ceil(f.bytes / MSS)} 个 TCP 段`) : ""}
                 </div>
               </div>
             );
@@ -273,9 +276,9 @@ export function Stage({ tcp }: { tcp: boolean }) {
         </div>
       </div>
       <div className="legend">
-        <span className="ep sw" data-ep="plain">明文</span>
-        <span className="ep sw" data-ep="hs">{"{握手密钥}"}</span>
-        <span className="ep sw" data-ep="app">[应用密钥]</span>
+        <span className="ep sw" data-ep="plain">{tr("plaintext", "明文")}</span>
+        <span className="ep sw" data-ep="hs">{tr("{handshake}", "{握手密钥}")}</span>
+        <span className="ep sw" data-ep="app">{tr("[application]", "[应用密钥]")}</span>
         <span className="ep sw" data-ep="tcp">TCP</span>
       </div>
     </div>

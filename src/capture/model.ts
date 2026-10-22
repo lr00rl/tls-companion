@@ -1,3 +1,4 @@
+import { tx } from "../i18n/lang";
 import type { Capture, HsMessage, Side, WireRecord } from "../data/types";
 import { EV_ENTER, EV_LEAVE, EV_READ, EV_SECRET, EV_WRITE } from "../data/types";
 import { alertDescriptions, contentTypes, handshakeShort, hrrRandom } from "./names";
@@ -234,7 +235,7 @@ export function recordLabel(model: Model, ri: number): string {
     const d = parseInt(r.plain.slice(2, 4), 16);
     label = `Alert ${alertDescriptions[d] ?? d}`;
   } else if (r.inner === 23) {
-    label = "应用数据";
+    label = tx("app data", "应用数据");
   } else {
     label = contentTypes[r.inner] ?? `type ${r.inner}`;
   }

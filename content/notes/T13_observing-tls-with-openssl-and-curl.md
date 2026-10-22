@@ -6,7 +6,7 @@ status: done
 
 # T13 · 动手实验：用 openssl 与 curl 观察握手
 
-> 系列：[[00_TLS系列总览与学习路线|TLS 系列总览]] · 上一篇：[[T12_HTTPS推广与信任治理|T12 HTTPS 推广与信任治理]] · 术语与标准：[[T99_术语表与标准索引|T99]]
+> 系列：[[00_tls-series-overview|TLS 系列总览]] · 上一篇：[[T12_https-adoption-and-trust-governance|T12 HTTPS 推广与信任治理]] · 术语与标准：[[T99_glossary-and-standards-index|T99]]
 > 前置知识：T03 的证书结构，T05、T06 的握手消息，读的时候对照着看。
 > 环境：macOS，Apple M3；OpenSSL 4.0.3（`/opt/homebrew/bin/openssl`，2026-09-29 发布）；系统自带 curl 8.7.1（LibreSSL 3.3.6 后端）；系统自带 dig 9.10.6
 > 整理日期：2026-10-16（所有输出为 2026-10-17 02:49 到 03:23 UTC 之间的真实采集，只连接公开网站）

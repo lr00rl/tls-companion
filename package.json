@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -p . && vite build",
+    "build": "tsc -p . && vite build && node scripts/build-seo.mjs",
     "preview": "vite preview",
     "typecheck": "tsc -p .",
     "test": "vitest run",

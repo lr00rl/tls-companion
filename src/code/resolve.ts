@@ -1,20 +1,27 @@
 import type { CodeFile, Sym } from "../data/types";
 import type { SymbolIndex } from "../data/load";
+import { tx } from "../i18n/lang";
 
 /** Token kinds written by tools/cmd/tlsindex. */
 export const KIND_CLASS = ["", "kw", "cm", "st", "nu", "id", "fn", "me", "ty", "fd", "co", "va", "pk", "bi", "lo", "lb", "", "lk"];
 export const DEF_BIT = 32;
 
-export const kindName: Record<number, string> = {
-  6: "函数",
-  7: "方法",
-  8: "类型",
-  9: "字段",
-  10: "常量",
-  11: "包级变量",
-  12: "包",
-  14: "局部",
+const kindNames: Record<number, readonly [string, string]> = {
+  6: ["func", "函数"],
+  7: ["method", "方法"],
+  8: ["type", "类型"],
+  9: ["field", "字段"],
+  10: ["const", "常量"],
+  11: ["var", "包级变量"],
+  12: ["package", "包"],
+  14: ["local", "局部"],
 };
+
+/** A symbol kind in the active language; call it while rendering. */
+export function kindName(k: number): string {
+  const n = kindNames[k];
+  return n ? tx(n[0], n[1]) : "";
+}
 
 export type Resolved =
   | { kind: "sym"; key: string; sym: Sym }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { executingAt, useWB } from "../app/store";
 import { shortFn, type Call, type Model } from "../capture/model";
+import { useTx } from "../i18n/lang";
 import { useTreeNav } from "../ui/tree";
 
 interface Row {
@@ -12,6 +13,7 @@ interface Row {
 
 /** The real call tree of crypto/tls for the current step, both endpoints. */
 export function TracePanel() {
+  const t = useTx();
   const model = useWB((s) => s.model);
   const steps = useWB((s) => s.steps);
   const step = useWB((s) => s.step);
@@ -89,20 +91,20 @@ export function TracePanel() {
   return (
     <div className="panel trace">
       <div className="panel-head">
-        <h2>调用追踪</h2>
-        <span className="muted num">{rows.length} 行</span>
+        <h2>{t("Call trace", "调用追踪")}</h2>
+        <span className="muted num">{t(`${rows.length} rows`, `${rows.length} 行`)}</span>
         <span className="spacer" />
-        <div className="seg-ctl" role="group" aria-label="追踪范围">
+        <div className="seg-ctl" role="group" aria-label={t("Trace range", "追踪范围")}>
           <button className="btn" aria-pressed={!whole} onClick={() => setWhole(false)}>
-            当前步骤
+            {t("This step", "当前步骤")}
           </button>
           <button className="btn" aria-pressed={whole} onClick={() => setWhole(true)}>
-            整条连接
+            {t("Whole connection", "整条连接")}
           </button>
         </div>
       </div>
-      <div className="panel-body tr-list" ref={list} role="tree" aria-label="调用追踪" {...nav.treeProps}>
-        {rows.length === 0 && <div className="empty">这一步里没有被追踪的 crypto/tls 调用。</div>}
+      <div className="panel-body tr-list" ref={list} role="tree" aria-label={t("Call trace", "调用追踪")} {...nav.treeProps}>
+        {rows.length === 0 && <div className="empty">{t("No traced crypto/tls call in this step.", "这一步里没有被追踪的 crypto/tls 调用。")}</div>}
         {rows.map(({ call, depth, repeat, hasKids }) => {
           const isOpen = open.has(call.id);
           const done = call.enter <= cursor;

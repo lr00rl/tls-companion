@@ -116,6 +116,11 @@
   border-color: var(--accent-line);
   color: var(--ink);
 }
+.lang-btn {
+  font-size: 12px;
+  font-weight: 650;
+  padding: 0 7px;
+}
 .search-btn svg,
 .topbar .btn svg {
   width: 16px;
@@ -140,4 +145,22 @@
   .topnav a {
     padding: 5px 7px;
   }
+}
+
+/* The English area names are wider than the Chinese ones; on a phone the bar
+   tightens its spacing so all five still fit beside the buttons. */
+@media (max-width: 480px) {
+  .topbar {
+    gap: 2px;
+    padding-left: 10px;
+  }
+  .brand {
+    margin-right: 4px;
+  }
+  .topnav a {
+    padding: 5px 6px;
+  }
+}
+.topnav.more {
+  mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
 }

@@ -6,7 +6,7 @@ status: done
 
 # T03 · 证书与 PKI：信任从哪里来
 
-> 系列：[[00_TLS系列总览与学习路线|TLS 系列总览]] · 上一篇：[[T02_密码学基础_TLS用到的每一种算法|T02 密码学基础]] · 下一篇：[[T04_从SSL到TLS13_协议演进与攻击史|T04 协议演进与攻击史]]
+> 系列：[[00_tls-series-overview|TLS 系列总览]] · 上一篇：[[T02_cryptography-foundations-for-tls|T02 密码学基础]] · 下一篇：[[T04_ssl-to-tls13-evolution-and-attacks|T04 协议演进与攻击史]]
 > 前置知识：T02 的数字签名和哈希。
 > 主要标准：RFC 5280（X.509 证书与 CRL）、RFC 9525（TLS 中的服务身份校验）、RFC 6960（OCSP）、RFC 6066 §8（OCSP stapling）、RFC 7633（Must-Staple）、RFC 6962 与 RFC 9162（证书透明度）、RFC 8659（CAA）、RFC 8555（ACME）、RFC 8737（TLS-ALPN-01）、CA/B Forum Baseline Requirements
 > 整理日期：2026-10-16（文中真实证书于 2026-10-17 02:49 UTC 从 letsencrypt.org 抓取）
@@ -105,7 +105,7 @@ DER 是一种 TLV（类型、长度、值）编码。上面这张证书 DER 编�
 45     30 33 31 0b 30 09 06 03 ...  issuer 名字，开始是 C=US
 ```
 
-`openssl asn1parse` 可以把整张证书按这个层次打印出来，[[T13_动手实验_用openssl与curl观察握手|T13]] 里有完整的操作。理解 DER 的意义在于：证书是一份精确的二进制文档，签名覆盖的是这些确切的字节；历史上不少证书验证漏洞（比如对名字字段里嵌入空字节的不同解析）都出在 ASN.1 解析不一致上。
+`openssl asn1parse` 可以把整张证书按这个层次打印出来，[[T13_observing-tls-with-openssl-and-curl|T13]] 里有完整的操作。理解 DER 的意义在于：证书是一份精确的二进制文档，签名覆盖的是这些确切的字节；历史上不少证书验证漏洞（比如对名字字段里嵌入空字节的不同解析）都出在 ASN.1 解析不一致上。
 
 ```mermaid
 flowchart TD
@@ -206,7 +206,7 @@ flowchart TD
 
 信任锚，也就是根证书，存放在根证书库（trust store）里。每个主要的平台都维护着自己的根库：Apple 的根库用于 macOS、iOS 及其上的 Safari 和大部分 App；Microsoft 的用于 Windows；Mozilla 的 NSS 根库用于 Firefox，也被大量 Linux 发行版和开源软件（包括 Homebrew 的 ca-certificates）当作事实标准；Google 从 2022 年起逐步让 Chrome 在各平台上使用自己的 Chrome Root Store，而不再依赖操作系统的根库。本机 2026-10-17 的实际数字是：macOS 系统根库 `/System/Library/Keychains/SystemRootCertificates.keychain` 里有 158 张根证书，Homebrew OpenSSL 使用的证书包里有 193 张。
 
-一个 CA 要进入根库，要满足对应根程序（root program）的要求：遵守 CA/B Forum 的 Baseline Requirements（规定了域名验证方法、证书内容、有效期、密钥保护等），每年通过 WebTrust 或 ETSI 的独立审计，在公共数据库 CCADB 里披露自己的全部中间证书和审计报告，出了事故要按要求公开报告。根程序可以随时把不守规矩的 CA 移出，这是整个体系里最有力的惩戒手段，Symantec、Entrust 等事件都在 [[T12_HTTPS推广与信任治理|T12]] 里。
+一个 CA 要进入根库，要满足对应根程序（root program）的要求：遵守 CA/B Forum 的 Baseline Requirements（规定了域名验证方法、证书内容、有效期、密钥保护等），每年通过 WebTrust 或 ETSI 的独立审计，在公共数据库 CCADB 里披露自己的全部中间证书和审计报告，出了事故要按要求公开报告。根程序可以随时把不守规矩的 CA 移出，这是整个体系里最有力的惩戒手段，Symantec、Entrust 等事件都在 [[T12_https-adoption-and-trust-governance|T12]] 里。
 
 ## "这个根签出来的任何证书都会被信任"
 
@@ -374,9 +374,9 @@ Let's Encrypt 从 2015 年起就只签 90 天证书，并且走得比行业时�
 
 ## 证书用什么密钥：RSA 还是 ECDSA
 
-证书里的公钥类型影响握手的大小和服务器的计算量。RSA-2048 证书的公钥约 256 字节，CA 用 RSA 签名又是 256 字节；ECDSA P-256 证书的公钥 65 字节，签名约 70 字节。更重要的是服务器每次握手都要用私钥做一次签名（TLS 1.3 的 CertificateVerify），ECDSA P-256 的签名比 RSA-2048 的私钥运算快一个数量级左右。所以现代部署倾向于 ECDSA 证书，letsencrypt.org 自己就是 P-256 叶子加 P-384 中间证书：实测它发送的四张证书一共 3576 字节（1098、656、682、1140），远小于 TCP 初始拥塞窗口约 14KB 的门槛，不会因为证书太大而多出一个往返（见 [[T07_会话恢复_0-RTT与握手性能优化|T07]]）。
+证书里的公钥类型影响握手的大小和服务器的计算量。RSA-2048 证书的公钥约 256 字节，CA 用 RSA 签名又是 256 字节；ECDSA P-256 证书的公钥 65 字节，签名约 70 字节。更重要的是服务器每次握手都要用私钥做一次签名（TLS 1.3 的 CertificateVerify），ECDSA P-256 的签名比 RSA-2048 的私钥运算快一个数量级左右。所以现代部署倾向于 ECDSA 证书，letsencrypt.org 自己就是 P-256 叶子加 P-384 中间证书：实测它发送的四张证书一共 3576 字节（1098、656、682、1140），远小于 TCP 初始拥塞窗口约 14KB 的门槛，不会因为证书太大而多出一个往返（见 [[T07_session-resumption-0-rtt-and-performance|T07]]）。
 
-为了兼容只支持 RSA 的老客户端，很多服务器同时部署一张 RSA 证书和一张 ECDSA 证书，按客户端 ClientHello 里的 signature_algorithms 选择发哪一张，nginx、Caddy 等都支持这种双证书配置。后量子签名会把这个尺寸问题放大几十倍，那是 [[T10_后量子TLS_ML-KEM混合密钥交换与MTC|T10]] 的主题。
+为了兼容只支持 RSA 的老客户端，很多服务器同时部署一张 RSA 证书和一张 ECDSA 证书，按客户端 ClientHello 里的 signature_algorithms 选择发哪一张，nginx、Caddy 等都支持这种双证书配置。后量子签名会把这个尺寸问题放大几十倍，那是 [[T10_post-quantum-tls|T10]] 的主题。
 
 ## 常见误解
 
