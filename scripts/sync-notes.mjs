@@ -1,12 +1,14 @@
-// Copies the TLS notes from the Obsidian vault into content/notes, which is the
-// copy the site builds from. Set TLS_NOTES_DIR to sync from somewhere else.
+// Copies the TLS notes from an Obsidian vault folder into content/notes, which is
+// the copy the site builds from. The folder is the first argument, or
+// TLS_NOTES_DIR when no argument is given.
 import { cpSync, readdirSync, rmSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { homedir } from "node:os";
 
-const src =
-  process.env.TLS_NOTES_DIR ??
-  join(homedir(), "roobli/Nut/RooB/A000_Theoretical_Knowledge/A406_Network/tls");
+const src = process.argv[2] || process.env.TLS_NOTES_DIR;
+if (!src) {
+  console.error("usage: pnpm sync:notes <notes-dir>   (or set TLS_NOTES_DIR)");
+  process.exit(2);
+}
 const dst = new URL("../content/notes/", import.meta.url).pathname;
 const filenames = {
   "00": "00_tls-series-overview.md",

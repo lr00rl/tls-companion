@@ -49,7 +49,7 @@ pnpm dev           # http://localhost:5173/tls-companion/
 pnpm build         # static site in dist/
 ```
 
-`pnpm sync:notes` copies the notes from the Obsidian vault into `content/notes` (set `TLS_NOTES_DIR` to point elsewhere).
+`pnpm sync:notes <notes-dir>` copies the notes from that folder of the Obsidian vault into `content/notes`. Without an argument it reads the folder from `TLS_NOTES_DIR`, and it stops with a usage line when neither is set.
 
 The two languages are kept in step by hand. The Chinese notes in the vault are the originals. Both source directories use the same portable ASCII filenames (`T06_tls13-handshake-and-key-schedule.md`, for example), and each English file is the translation of the Chinese file with the same ID and headings in the same order. `pnpm test` fails if filenames, note IDs, or headings drift between the editions, because language switching and the workbench's links into the notes depend on them. Scenario steps and history entries are written in English in `src/scenarios` and `src/history`, with the Chinese in `src/i18n/zhContent.ts` under the same ids. Interface strings are written in place as English and Chinese pairs (`useTx` in components, `tx` elsewhere, and a `Bi` pair for text kept in state). `pnpm fetch:rfc` downloads any RFC added to the list in `scripts/fetch-rfc.mjs`.
 
