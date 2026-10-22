@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { createPortal } from "react-dom";
 import type { CodeTarget } from "../app/store";
 import { href } from "../app/route";
+import { pick, useLang, useTx } from "../i18n/lang";
 import { load, NotFoundError, useLoad, type SymbolIndex } from "../data/load";
 import type { CodeFile } from "../data/types";
 import {
@@ -49,6 +50,8 @@ interface Hover {
 
 export function CodeView({ target, symbols, goVersion, onNavigate, onRfc, exec, toolbar, empty }: Props) {
   const file = useLoad<CodeFile>(target ? target.file : null, () => load.file(target!.file));
+  const t = useTx();
+  const lang = useLang();
   const scroller = useRef<HTMLDivElement>(null);
   const [scroll, setScroll] = useState({ top: 0, height: 600 });
   const [hover, setHover] = useState<Hover | null>(null);
@@ -130,10 +133,10 @@ export function CodeView({ target, symbols, goVersion, onNavigate, onRfc, exec, 
     switch (res.kind) {
       case "sym":
         if (isDef) setRefsFor(res.key);
-        else onNavigate({ file: res.sym.f, line: res.sym.l, range: [res.sym.l, res.sym.e ?? res.sym.l], reason: `定义：${symDisplay(res.sym)}` }, true);
+        else onNavigate({ file: res.sym.f, line: res.sym.l, range: [res.sym.l, res.sym.e ?? res.sym.l], reason: [`Definition: ${symDisplay(res.sym)}`, `定义：${symDisplay(res.sym)}`] }, true);
         break;
       case "local":
-        if (target && !isDef) onNavigate({ file: target.file, line: res.line, range: target.range, reason: "局部定义" }, true);
+        if (target && !isDef) onNavigate({ file: target.file, line: res.line, range: target.range, reason: ["Local definition", "局部定义"] }, true);
         break;
       case "rfc":
         onRfc(res.n, res.section);
@@ -267,7 +270,7 @@ export function CodeView({ target, symbols, goVersion, onNavigate, onRfc, exec, 
             {calls ? (
               <button
                 className={`dot${ln === execCur ? " now" : ""}`}
-                title={`这一行在本次采集中发起了 ${calls} 次被追踪的调用，点击跳到第一次`}
+                title={t(`This line made ${calls} traced calls in the capture. Click to jump to the first.`, `这一行在本次采集中发起了 ${calls} 次被追踪的调用，点击跳到第一次`)}
                 onClick={() => exec?.onLine?.(target!.file, ln)}
               />
             ) : (
@@ -293,21 +296,21 @@ export function CodeView({ target, symbols, goVersion, onNavigate, onRfc, exec, 
               {declSym && <span className="crumb-fn"> › {symDisplay(declSym)}</span>}
             </>
           ) : (
-            <span className="muted">未打开文件</span>
+            <span className="muted">{t("No file open", "未打开文件")}</span>
           )}
         </div>
         <span className="spacer" />
         {target && (
-          <a className="btn" href={goUpstream(goVersion, target.file, caret)} target="_blank" rel="noopener" title="在 GitHub 上查看 golang/go 的原始文件">
+          <a className="btn" href={goUpstream(goVersion, target.file, caret)} target="_blank" rel="noopener" title={t("View this file in golang/go on GitHub", "在 GitHub 上查看 golang/go 的原始文件")}>
             <svg viewBox="0 0 16 16" aria-hidden>
               <path fill="currentColor" d="M8 0a8 8 0 0 0-2.5 15.6c.4 0 .5-.2.5-.4v-1.5c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.3 1.9.9 2.4.7 0-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8a7.4 7.4 0 0 1 4 0c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.9 3.8-3.7 4 .3.3.6.8.6 1.5v2.2c0 .2.1.5.6.4A8 8 0 0 0 8 0Z" />
             </svg>
-            <span className="hide-sm">上游</span>
+            <span className="hide-sm">{t("Upstream", "上游")}</span>
           </a>
         )}
       </div>
-      {target?.reason && <div className="code-reason">{target.reason}</div>}
-      {data?.ignored && <div className="code-reason warn">这个文件在默认构建里被构建约束排除，只做语法高亮，没有交叉引用。</div>}
+      {target?.reason && <div className="code-reason">{pick(target.reason, lang)}</div>}
+      {data?.ignored && <div className="code-reason warn">{t("A build constraint excludes this file from the default build. It is highlighted only, with no cross-references.", "这个文件在默认构建里被构建约束排除，只做语法高亮，没有交叉引用。")}</div>}
       <div
         className="code-scroll"
         ref={scroller}
@@ -315,7 +318,7 @@ export function CodeView({ target, symbols, goVersion, onNavigate, onRfc, exec, 
         // the next file loads would blur it and hand the arrows to the workbench.
         tabIndex={target ? 0 : undefined}
         role={target ? "region" : undefined}
-        aria-label={target ? `${target.file.split("/").pop()} 源码：上下键换行，左右键选标识符，回车跳转` : undefined}
+        aria-label={target ? t(`${target.file.split("/").pop()} source. Up and Down move lines, Left and Right pick an identifier, Enter follows it.`, `${target.file.split("/").pop()} 源码：上下键换行，左右键选标识符，回车跳转`) : undefined}
         onFocus={(e) => {
           if (e.target === e.currentTarget && e.currentTarget.matches(":focus-visible")) setKb((k) => k ?? { line: caret ?? 1, tok: 0 });
         }}
@@ -335,20 +338,21 @@ export function CodeView({ target, symbols, goVersion, onNavigate, onRfc, exec, 
           hoverTimer.current = window.setTimeout(() => setHover(null), 200);
         }}
       >
-        {!target && (empty ?? <div className="empty">选择一个步骤、字段或调用来打开代码。</div>)}
+        {!target && (empty ?? <div className="empty">{t("Choose a step, a field, or a call to open the code.", "选择一个步骤、字段或调用来打开代码。")}</div>)}
         {target && file.state === "loading" && <div className="loading-bar" />}
         {file.state === "error" &&
           (file.error instanceof NotFoundError ? (
             <div className="empty">
-              <strong>{target?.file} 不在索引里</strong>
-              这里只收录 crypto/tls 和它的密码学依赖。<a href={href({ page: "code" })}>回到源码目录</a>
+              <strong>{t(`${target?.file} is not in the index`, `${target?.file} 不在索引里`)}</strong>
+              {t("The index covers crypto/tls and the cryptography it depends on. ", "这里只收录 crypto/tls 和它的密码学依赖。")}
+              <a href={href({ page: "code" })}>{t("Back to the file list", "回到源码目录")}</a>
             </div>
           ) : (
             <div className="empty">
-              <strong>源码加载失败</strong>
+              <strong>{t("Could not load the source", "源码加载失败")}</strong>
               {file.error.message}{" "}
               <button className="btn outline" onClick={file.retry}>
-                重试
+                {t("Retry", "重试")}
               </button>
             </div>
           ))}
@@ -385,6 +389,7 @@ export function CodeView({ target, symbols, goVersion, onNavigate, onRfc, exec, 
 
 function HoverCard({ hover, onEnter, onLeave, onRefs }: { hover: Hover; onEnter: () => void; onLeave: () => void; onRefs: (k: string) => void }) {
   const { rect, res, isDef } = hover;
+  const t = useTx();
   const below = rect.top < 240;
   const style: React.CSSProperties = {
     left: Math.max(8, Math.min(rect.left, window.innerWidth - 488)),
@@ -398,16 +403,16 @@ function HoverCard({ hover, onEnter, onLeave, onRefs }: { hover: Hover; onEnter:
       body = (
         <>
           <div className="hc-kind">
-            {s ? kindName[s.t] ?? "" : ""} · <span className="mono">{splitKey(res.key)[0].replace(/^vendor\//, "")}</span>
-            {res.kind === "external" && " · 未收录，点击打开上游"}
+            {s ? kindName(s.t) : ""} · <span className="mono">{splitKey(res.key)[0].replace(/^vendor\//, "")}</span>
+            {res.kind === "external" && t(" · not indexed. Click to open upstream", " · 未收录，点击打开上游")}
           </div>
           {s?.s && <pre className="hc-sig">{s.s}</pre>}
           {s?.d && <div className="hc-doc">{s.d}</div>}
           <div className="hc-actions">
-            {res.kind === "sym" && (isDef ? <span>点击查看所有引用</span> : <span>点击跳到定义</span>)}
+            {res.kind === "sym" && (isDef ? <span>{t("Click for every reference", "点击查看所有引用")}</span> : <span>{t("Click to jump to the definition", "点击跳到定义")}</span>)}
             {res.kind === "sym" && !isDef && (
               <button className="btn" onClick={() => onRefs(res.key)}>
-                查看引用
+                {t("References", "查看引用")}
               </button>
             )}
           </div>
@@ -418,7 +423,7 @@ function HoverCard({ hover, onEnter, onLeave, onRefs }: { hover: Hover; onEnter:
     case "local":
       body = (
         <>
-          <div className="hc-kind">局部声明 · 第 {res.line} 行</div>
+          <div className="hc-kind">{t(`local · line ${res.line}`, `局部声明 · 第 ${res.line} 行`)}</div>
           <pre className="hc-sig">{res.sig}</pre>
         </>
       );
@@ -427,12 +432,13 @@ function HoverCard({ hover, onEnter, onLeave, onRefs }: { hover: Hover; onEnter:
       body = (
         <div className="hc-kind">
           RFC {res.n}
-          {res.section ? ` §${res.section}` : ""} · 点击打开规范原文
+          {res.section ? ` §${res.section}` : ""}
+          {t(" · click to open the RFC", " · 点击打开规范原文")}
         </div>
       );
       break;
     case "pkg":
-      body = <div className="hc-kind">包 {res.path} · 点击在 pkg.go.dev 打开</div>;
+      body = <div className="hc-kind">{t(`package ${res.path} · click to open on pkg.go.dev`, `包 ${res.path} · 点击在 pkg.go.dev 打开`)}</div>;
       break;
     case "url":
       body = <div className="hc-kind mono">{res.url}</div>;

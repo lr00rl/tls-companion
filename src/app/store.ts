@@ -2,7 +2,8 @@ import { create } from "zustand";
 import { buildModel, type Call, type Model } from "../capture/model";
 import { EV_ENTER, type Side } from "../data/types";
 import { load, type SymbolIndex } from "../data/load";
-import { scenarioById } from "../scenarios";
+import { scenarioFor } from "../i18n/content";
+import { getLang, subscribeLang, tx, type Bi } from "../i18n/lang";
 import { resolveSteps, stepAt, type Step } from "../scenarios/resolve";
 import type { InspectorTab } from "../scenarios/types";
 import { navigate } from "./route";
@@ -17,7 +18,7 @@ export interface CodeTarget {
   /** Resolve the caret line by searching for this text inside `range`. */
   find?: string;
   /** Why the panel is here, shown in its header. */
-  reason?: string;
+  reason?: Bi;
 }
 
 export type Selection = { kind: "msg"; index: number; field?: string[] } | { kind: "rec"; index: number } | null;
@@ -60,7 +61,7 @@ interface WorkbenchState {
   setTab(t: InspectorTab): void;
   setKeySide(s: Side): void;
   openCode(t: CodeTarget, opts?: { push?: boolean }): void;
-  openSymbol(key: string, opts?: { push?: boolean; reason?: string; find?: string }): Promise<void>;
+  openSymbol(key: string, opts?: { push?: boolean; reason?: Bi; find?: string }): Promise<void>;
   codeGoBack(): void;
   codeGoForward(): void;
   selectCall(id: number): void;
@@ -71,10 +72,16 @@ interface WorkbenchState {
   setScrubbing(b: boolean): void;
 }
 
-function symTarget(ix: SymbolIndex, key: string, find?: string, reason?: string): CodeTarget | null {
+function symTarget(ix: SymbolIndex, key: string, find?: string, reason?: Bi): CodeTarget | null {
   const s = ix.byKey.get(key);
   if (!s || s.x) return null;
   return { file: s.f, line: s.l, range: [s.l, s.e ?? s.l], find, reason };
+}
+
+function stepReason(scenario: string, stepId: string): Bi {
+  const en = scenarioFor("en", scenario)?.steps.find((step) => step.id === stepId)?.title ?? stepId;
+  const zh = scenarioFor("zh", scenario)?.steps.find((step) => step.id === stepId)?.title ?? stepId;
+  return [en, zh];
 }
 
 /** What a step selects in the inspector, whether reached by stepping or scrubbing. */
@@ -130,9 +137,9 @@ export const useWB = create<WorkbenchState>((set, get) => ({
   },
 
   async open(scenario, step) {
-    const def = scenarioById.get(scenario);
+    const def = scenarioFor(getLang(), scenario);
     if (!def) {
-      set({ loadError: `没有名为 ${scenario} 的场景` });
+      set({ loadError: tx(`No scenario named ${scenario}`, `没有名为 ${scenario} 的场景`) });
       return;
     }
     // model is cleared whenever a load starts, so a non-null model always
@@ -148,7 +155,10 @@ export const useWB = create<WorkbenchState>((set, get) => ({
       const [cap] = await Promise.all([load.capture(scenario), get().ensureSymbols()]);
       if (get().scenario !== scenario) return;
       const model = buildModel(cap);
-      const { steps, errors } = resolveSteps(model, def);
+      // The reader may switch languages while the capture and symbol index are
+      // loading. Resolve against the edition active when the data is ready.
+      const activeDef = scenarioFor(getLang(), scenario) ?? def;
+      const { steps, errors } = resolveSteps(model, activeDef);
       if (errors.length) console.warn("[tls-companion] unresolved steps", errors);
       set({ model, steps, errors, loading: false, sel: null, traceSel: null, codeBack: [], codeFwd: [] });
       const at = Math.min(step ?? 0, Math.max(0, steps.length - 1));
@@ -163,7 +173,7 @@ export const useWB = create<WorkbenchState>((set, get) => ({
     const { steps, symbols, scenario } = get();
     const s = steps[i];
     if (!s) return;
-    const code = s.code && symbols ? symTarget(symbols, s.code.fn, s.code.find, s.title) : get().code;
+    const code = s.code && symbols ? symTarget(symbols, s.code.fn, s.code.find, scenario ? stepReason(scenario, s.id) : s.title) : get().code;
     set({ step: i, cursor: s.start, ...stepSelection(s, get().tab), code, traceSel: null });
     if (!opts?.keepUrl && scenario) navigate({ page: "play", scenario, step: i }, { replace: true });
   },
@@ -193,7 +203,7 @@ export const useWB = create<WorkbenchState>((set, get) => ({
           file: site.file,
           line: site.line,
           range: ps && ps.f === site.file ? [ps.l, ps.e ?? ps.l] : undefined,
-          reason: `正在执行：调用 ${site.fn.split(".").slice(-2).join(".")}`,
+          reason: [`Running: ${site.fn.split(".").slice(-2).join(".")}`, `正在执行：调用 ${site.fn.split(".").slice(-2).join(".")}`],
         };
       }
       patch.traceSel = c ? c.id : null;
@@ -221,7 +231,7 @@ export const useWB = create<WorkbenchState>((set, get) => ({
   selectField(path, go, range) {
     const sel = get().sel;
     if (sel?.kind === "msg") set({ sel: { ...sel, field: path }, hover: range ?? null });
-    if (go) void get().openSymbol(go, { reason: `字段 ${path?.slice(-1)[0] ?? ""} 对应的 Go 字段` });
+    if (go) void get().openSymbol(go, { reason: [`Go field for ${path?.slice(-1)[0] ?? "this field"}`, `字段 ${path?.slice(-1)[0] ?? ""} 对应的 Go 字段`] });
   },
 
   setHover(hover) {
@@ -264,7 +274,7 @@ export const useWB = create<WorkbenchState>((set, get) => ({
     if (!model) return;
     const c = model.calls[id];
     get().setCursor(c.enter);
-    const t = symbols ? symTarget(symbols, c.fn, undefined, `调用 #${id}：${c.fn.split("/").pop()}`) : null;
+    const t = symbols ? symTarget(symbols, c.fn, undefined, [`Call #${id}: ${c.fn.split("/").pop()}`, `调用 #${id}：${c.fn.split("/").pop()}`]) : null;
     set({ traceSel: id });
     if (t) get().openCode(t, { push: true });
   },
@@ -290,3 +300,13 @@ export const useWB = create<WorkbenchState>((set, get) => ({
     set(landed ? { scrubbing, ...stepSelection(steps[step], tab) } : { scrubbing });
   },
 }));
+
+// Step titles and note anchors follow the language. The capture stays loaded.
+subscribeLang(() => {
+  const { scenario, model } = useWB.getState();
+  if (!scenario || !model) return;
+  const def = scenarioFor(getLang(), scenario);
+  if (!def) return;
+  const { steps, errors } = resolveSteps(model, def);
+  useWB.setState({ steps, errors });
+});

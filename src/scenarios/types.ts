@@ -55,6 +55,10 @@ export interface StepDef {
 
 export interface ScenarioDef {
   id: string;
+  /** Full name, shown in the scenario menu on a wide window. */
+  title: string;
+  /** One line under the name on the home page. */
+  brief: string;
   /** A name that fits the transport bar on a phone. */
   short: string;
   /** One paragraph shown above the steps. */

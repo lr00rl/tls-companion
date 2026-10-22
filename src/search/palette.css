@@ -35,6 +35,10 @@
   padding: 0 14px;
   border-bottom: 1px solid var(--line);
 }
+.pal-input:focus-within {
+  border-bottom-color: var(--accent);
+  box-shadow: inset 0 -1px var(--accent);
+}
 .pal-input svg {
   width: 16px;
   height: 16px;

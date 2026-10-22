@@ -3,17 +3,19 @@ import { href } from "../app/route";
 import { usePeek } from "../app/peek";
 import { executingAt, useWB } from "../app/store";
 import { CodeView, type ExecOverlay } from "../code/CodeView";
+import { useTx } from "../i18n/lang";
 
 export function BackForward({ back, fwd, onBack, onFwd }: { back: boolean; fwd: boolean; onBack: () => void; onFwd: () => void }) {
+  const t = useTx();
   return (
     <>
-      <button className="btn" disabled={!back} onClick={onBack} title="后退" aria-label="后退">
-        <svg viewBox="0 0 16 16">
+      <button className="btn" disabled={!back} onClick={onBack} title={t("Back", "后退")} aria-label={t("Back", "后退")}>
+        <svg viewBox="0 0 16 16" aria-hidden>
           <path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" strokeWidth="1.6" />
         </svg>
       </button>
-      <button className="btn" disabled={!fwd} onClick={onFwd} title="前进" aria-label="前进">
-        <svg viewBox="0 0 16 16">
+      <button className="btn" disabled={!fwd} onClick={onFwd} title={t("Forward", "前进")} aria-label={t("Forward", "前进")}>
+        <svg viewBox="0 0 16 16" aria-hidden>
           <path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" strokeWidth="1.6" />
         </svg>
       </button>
@@ -23,6 +25,7 @@ export function BackForward({ back, fwd, onBack, onFwd }: { back: boolean; fwd: 
 
 /** The code panel inside the workbench, wired to the trace. */
 export function CodePanel() {
+  const t = useTx();
   const model = useWB((s) => s.model);
   const code = useWB((s) => s.code);
   const symbols = useWB((s) => s.symbols);
@@ -67,7 +70,7 @@ export function CodePanel() {
           <>
             <BackForward back={back} fwd={fwd} onBack={() => useWB.getState().codeGoBack()} onFwd={() => useWB.getState().codeGoForward()} />
             {code && (
-              <a className="btn" href={href({ page: "code", path: code.file, line: code.line })} title="在源码浏览器中打开">
+              <a className="btn" href={href({ page: "code", path: code.file, line: code.line })} title={t("Open in the code browser", "在源码浏览器中打开")}>
                 <svg viewBox="0 0 16 16" aria-hidden>
                   <path d="M9 3h4v4M13 3 7 9M11 9v4H3V5h4" fill="none" stroke="currentColor" strokeWidth="1.4" />
                 </svg>

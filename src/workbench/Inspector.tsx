@@ -5,6 +5,7 @@ import { dissect, dissectRecordPlain, type Field } from "../capture/dissect";
 import { hexBytes, messageName, recordLabel, wrapEpoch, type Model } from "../capture/model";
 import { contentTypes } from "../capture/names";
 import type { InspectorTab } from "../scenarios/types";
+import { useLang, useTx } from "../i18n/lang";
 import { useTreeNav, type TreeRow } from "../ui/tree";
 import { useFieldSites } from "./fieldSites";
 import { HexView } from "./HexView";
@@ -13,15 +14,15 @@ import { CertView, ConnView } from "./CertView";
 import { RecordView } from "./RecordView";
 import "./inspector.css";
 
-const tabs: [InspectorTab, string][] = [
-  ["fields", "字段"],
-  ["record", "记录"],
-  ["keys", "密钥"],
-  ["certs", "证书"],
-  ["conn", "连接"],
-];
-
 export function Inspector() {
+  const t = useTx();
+  const tabs: [InspectorTab, string][] = [
+    ["fields", t("Fields", "字段")],
+    ["record", t("Record", "记录")],
+    ["keys", t("Keys", "密钥")],
+    ["certs", t("Certs", "证书")],
+    ["conn", t("Conn", "连接")],
+  ];
   const model = useWB((s) => s.model);
   const tab = useWB((s) => s.tab);
   const sel = useWB((s) => s.sel);
@@ -29,7 +30,7 @@ export function Inspector() {
   return (
     <div className="panel inspector">
       <div className="panel-head">
-        <div className="tabs" role="tablist" aria-label="检查器">
+        <div className="tabs" role="tablist" aria-label={t("Inspector", "检查器")}>
           {tabs.map(([id, label]) => (
             <button key={id} role="tab" className="tab" aria-selected={tab === id} onClick={() => useWB.getState().setTab(id)}>
               {label}
@@ -63,6 +64,8 @@ function FieldsTab({ model }: { model: Model }) {
   const sel = useWB((s) => s.sel);
   const hover = useWB((s) => s.hover);
   const symbols = useWB((s) => s.symbols);
+  const lang = useLang();
+  const t = useTx();
   const [open, setOpen] = useState<Set<string>>(new Set());
 
   // Selecting a field replaces sel, so the dissection keys on the message alone.
@@ -77,8 +80,8 @@ function FieldsTab({ model }: { model: Model }) {
     }
     const r = model.cap.records[selIndex];
     const bytes = hexBytes(r.plain);
-    return { bytes, fields: dissectRecordPlain(r.inner, bytes), dir: r.dir, title: contentTypes[r.inner] ?? "记录", epoch: r.prot?.secret ?? "plaintext" };
-  }, [selKind, selIndex, model]);
+    return { bytes, fields: dissectRecordPlain(r.inner, bytes), dir: r.dir, title: contentTypes[r.inner] ?? t("record", "记录"), epoch: r.prot?.secret ?? "plaintext" };
+  }, [selKind, selIndex, model, lang]);
 
   // A new message opens at its top level.
   useEffect(() => {
@@ -138,8 +141,8 @@ function FieldsTab({ model }: { model: Model }) {
   if (!view)
     return (
       <div className="empty">
-        <strong>没有选中报文</strong>
-        在时序图上点一条记录，或者选一个步骤。
+        <strong>{t("No record selected", "没有选中报文")}</strong>
+        {t("Pick a record on the diagram, or choose a step.", "在时序图上点一条记录，或者选一个步骤。")}
       </div>
     );
 
@@ -182,16 +185,16 @@ function FieldsTab({ model }: { model: Model }) {
   return (
     <div className="fields-tab">
       <div className="ft-meta">
-        <span className={`dir dir-${view.dir}`}>{view.dir === 0 ? "客户端 → 服务器" : "服务器 → 客户端"}</span>
+        <span className={`dir dir-${view.dir}`}>{view.dir === 0 ? t("client → server", "客户端 → 服务器") : t("server → client", "服务器 → 客户端")}</span>
         <strong className="mono">{view.title}</strong>
-        <span className="num">{view.bytes.length} 字节</span>
-        <span className="muted">{view.epoch === "plaintext" ? "明文" : `解密自 ${view.epoch}`}</span>
+        <span className="num">{t(`${view.bytes.length} bytes`, `${view.bytes.length} 字节`)}</span>
+        <span className="muted">{view.epoch === "plaintext" ? t("plaintext", "明文") : t(`decrypted with ${view.epoch}`, `解密自 ${view.epoch}`)}</span>
       </div>
       <div className="ft-split">
         <div
           className="field-tree"
           role="tree"
-          aria-label={`${view.title} 的字段`}
+          aria-label={t(`Fields of ${view.title}`, `${view.title} 的字段`)}
           {...nav.treeProps}
           onPointerLeave={() => useWB.getState().setHover(selected ? [selected.start, selected.end] : null)}
         >
@@ -213,7 +216,7 @@ function FieldsTab({ model }: { model: Model }) {
           <div className="fd-title">
             <span className="mono">{namePath(view.fields, selPath!)}</span>
             <span className="num muted">
-              偏移 {selected.start}–{selected.end - 1}，{selected.end - selected.start} 字节
+              {t(`offset ${selected.start}-${selected.end - 1}, ${selected.end - selected.start} bytes`, `偏移 ${selected.start}-${selected.end - 1}，${selected.end - selected.start} 字节`)}
             </span>
           </div>
           {selected.note && <p className="fd-note">{selected.note}</p>}
@@ -226,26 +229,26 @@ function FieldsTab({ model }: { model: Model }) {
             )}
             {sites?.def && (
               <button className="chip" onClick={() => useWB.getState().openCode(sites.def!.target, { push: true })}>
-                <span className="k">Go 字段</span>
+                <span className="k">{t("Go field", "Go 字段")}</span>
                 {selected.go?.split(".").slice(-2).join(".")}
               </button>
             )}
             {sites?.writes.slice(0, 3).map((s, i) => (
               <button key={"w" + i} className="chip" onClick={() => useWB.getState().openCode(s.target, { push: true })}>
-                <span className="k">写入</span>
+                <span className="k">{t("Write", "写入")}</span>
                 {s.fn.split(".").slice(-2).join(".")}:{s.line}
               </button>
             ))}
             {sites?.reads.slice(0, 3).map((s, i) => (
               <button key={"r" + i} className="chip" onClick={() => useWB.getState().openCode(s.target, { push: true })}>
-                <span className="k">解析</span>
+                <span className="k">{t("Parse", "解析")}</span>
                 {s.fn.split(".").slice(-2).join(".")}:{s.line}
               </button>
             ))}
             {selected.cert !== undefined && (
               <button className="chip" onClick={() => useWB.getState().setTab("certs")}>
-                <span className="k">证书</span>
-                查看第 {selected.cert + 1} 张
+                <span className="k">{t("Cert", "证书")}</span>
+                {t(`certificate ${selected.cert + 1}`, `查看第 ${selected.cert + 1} 张`)}
               </button>
             )}
           </div>

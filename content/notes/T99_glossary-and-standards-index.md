@@ -6,7 +6,7 @@ status: done
 
 # T99 · 术语表与标准索引
 
-> 系列：[[00_TLS系列总览与学习路线|TLS 系列总览]]
+> 系列：[[00_tls-series-overview|TLS 系列总览]]
 > 用法：读到不熟悉的术语时查第一张表，"详见"一栏指向讲得最完整的那一篇；想查某个标准时查第二部分，状态以 2026-10-17 在 RFC Editor 和 IETF datatracker 核对的结果为准。
 > 整理日期：2026-10-16
 
@@ -78,7 +78,7 @@ status: done
 | 服务绑定记录 | SVCB，HTTPS 记录 | 发布 ALPN、地址提示、ECH 配置的 DNS 记录 | T08 |
 | 加密 DNS | DoH、DoT、DoQ | 把 DNS 查询放进 HTTPS、TLS 或 QUIC | T08 |
 | 匿名集 | anonymity set | ECH 能把目标隐藏在多少个名字之中 | T08 |
-| 快速 UDP 互联网连接 | QUIC | 在 UDP 上实现、内嵌 TLS 1.3 握手的传输协议 | T09 |
+| QUIC（名称，不是缩写） | QUIC | 在 UDP 上实现、内嵌 TLS 1.3 握手的传输协议 | T09 |
 | 加密级别 | encryption level | QUIC 的 Initial、0-RTT、Handshake、1-RTT | T09 |
 | 头部保护 | header protection | QUIC 用密文样本遮住包号和标志位 | T09 |
 | 连接迁移 | connection migration | QUIC 连接在 IP 变化后继续存在 | T09 |
@@ -121,7 +121,7 @@ status: done
 | RFC 7301 | ALPN | PS | T01 |
 | RFC 5746 | Renegotiation Indication Extension | PS | T04 |
 | RFC 7627 | Session Hash and Extended Master Secret | 已被 RFC 9846 取代 | T04、T05 |
-| RFC 7507 | Fallback Signaling Cipher Suite Value (SCSV) | PS | T04 |
+| RFC 7507 | Fallback Signaling Cipher Suite Value (SCSV) | PS，已被 RFC 8996 废止 | T04 |
 | RFC 7366 | Encrypt-then-MAC | PS | T02、T05 |
 | RFC 5077 | Session Resumption without Server-Side State | 已被取代 | T07 |
 | RFC 7918 | TLS False Start | Info | T07 |
@@ -179,7 +179,7 @@ status: done
 | RFC 9525 | Service Identity in TLS | PS | T03 |
 | RFC 6960 | Online Certificate Status Protocol | PS | T03 |
 | RFC 7633 | X.509v3 TLS Feature Extension（Must-Staple） | PS | T03 |
-| RFC 6962 | Certificate Transparency | Exp | T03 |
+| RFC 6962 | Certificate Transparency | Exp，已被 RFC 9162 取代 | T03 |
 | RFC 9162 | Certificate Transparency Version 2.0 | Exp | T03 |
 | RFC 8659 | CAA Resource Record | PS | T03 |
 | RFC 8657 | CAA Extensions for Account URI and ACME Method Binding | PS | T03 |
@@ -196,7 +196,7 @@ status: done
 | RFC 9113 | HTTP/2 | PS | T01、T07 |
 | RFC 9114 | HTTP/3 | PS | T09 |
 | RFC 9204 | QPACK | PS | T09 |
-| RFC 2818 | HTTP Over TLS | Info | T01 |
+| RFC 2818 | HTTP Over TLS | Info，已被 RFC 9110 取代 | T01 |
 | RFC 8999 | Version-Independent Properties of QUIC | PS | T09 |
 | RFC 9000 | QUIC Transport | PS | T09 |
 | RFC 9001 | Using TLS to Secure QUIC | PS | T09 |

@@ -3,7 +3,8 @@ import { href, navigate } from "../app/route";
 import { useWB } from "../app/store";
 import { load, useLoad } from "../data/load";
 import { RfcText } from "../rfc/RfcText";
-import { scenarioDefs } from "../scenarios";
+import { scenariosFor } from "../i18n/content";
+import { useLang, useTx } from "../i18n/lang";
 import { useMedia } from "../ui/hooks";
 import "../rfc/rfc.css";
 import "./pages.css";
@@ -26,22 +27,24 @@ export default function RfcPage({ n, section }: { n?: number; section?: string }
     document.querySelector(".rfc-doc-link.cur")?.scrollIntoView({ block: "nearest" });
   }, [num, index.state]);
 
+  const lang = useLang();
+  const t = useTx();
   const steps = useMemo(() => {
     const out: { scenario: string; step: number; title: string; sec?: string }[] = [];
-    for (const d of scenarioDefs)
+    for (const d of scenariosFor(lang))
       d.steps.forEach((s, i) => {
         for (const r of s.refs ?? []) if ("rfc" in r && r.rfc === num && (!section || r.sec === section)) out.push({ scenario: d.id, step: i, title: s.title, sec: r.sec });
       });
     return out;
-  }, [num, section]);
+  }, [num, section, lang]);
 
   const key = section ? `${num}#${section}` : `${num}`;
   const sites = cites.state === "ready" ? cites.data[key] ?? [] : [];
   const anySites = cites.state === "ready" ? Object.entries(cites.data).filter(([k]) => k.split("#")[0] === String(num)).reduce((a, [, v]) => a + v.length, 0) : 0;
 
   const side = index.state === "ready" && (
-    <nav className="rfc-side" aria-label="规范列表">
-      <input className="filter" placeholder="筛选 RFC 编号或标题" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="筛选 RFC" />
+    <nav className="rfc-side" aria-label={t("RFC list", "规范列表")}>
+      <input className="filter" name="rfc-filter" autoComplete="off" spellCheck={false} placeholder={t("Filter by number or title…", "筛选 RFC 编号或标题…")} value={filter} onChange={(e) => setFilter(e.target.value)} aria-label={t("Filter RFCs", "筛选 RFC")} />
       {index.data
         .filter((d) => !filter || String(d.n).includes(filter) || d.title.toLowerCase().includes(filter.toLowerCase()))
         .map((d) => (
@@ -81,7 +84,7 @@ export default function RfcPage({ n, section }: { n?: number; section?: string }
             <div className="rfc-meta">
               {doc.data.obsoletes.length > 0 && (
                 <span>
-                  取代：
+                  {t("Obsoletes:", "取代：")}
                   {doc.data.obsoletes.map((o) => (
                     <RfcLink key={o} n={o} bundled={bundled} />
                   ))}
@@ -89,7 +92,7 @@ export default function RfcPage({ n, section }: { n?: number; section?: string }
               )}
               {doc.data.updates.length > 0 && (
                 <span>
-                  更新：
+                  {t("Updates:", "更新：")}
                   {doc.data.updates.map((o) => (
                     <RfcLink key={o} n={o} bundled={bundled} />
                   ))}
@@ -99,8 +102,8 @@ export default function RfcPage({ n, section }: { n?: number; section?: string }
                 rfc-editor.org
               </a>
               {!wide && (
-                <select value={section ?? ""} onChange={(e) => navigate({ page: "rfc", n: num, section: e.target.value || undefined })} aria-label="跳到章节">
-                  <option value="">跳到章节…</option>
+                <select value={section ?? ""} onChange={(e) => navigate({ page: "rfc", n: num, section: e.target.value || undefined })} aria-label={t("Jump to a section", "跳到章节")}>
+                  <option value="">{t("Jump to a section…", "跳到章节…")}</option>
                   {doc.data.sections.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.id} {s.title}
@@ -114,23 +117,23 @@ export default function RfcPage({ n, section }: { n?: number; section?: string }
         {doc.state === "loading" && <div className="loading-bar" />}
         {doc.state === "error" && (
           <div className="empty">
-            <strong>RFC {num} 没有收录</strong>
+            <strong>{t(`RFC ${num} is not included`, `RFC ${num} 没有收录`)}</strong>
             <a href={`https://www.rfc-editor.org/rfc/rfc${num}`} target="_blank" rel="noopener">
-              在 rfc-editor.org 打开
+              {t("Open on rfc-editor.org", "在 rfc-editor.org 打开")}
             </a>
           </div>
         )}
         {doc.state === "ready" && section && !doc.data.sections.some((s) => s.id === section) && (
           <div className="rfc-missing" role="status">
-            RFC {num} 没有 §{section}，下面从开头显示。
+            {t(`RFC ${num} has no §${section}. Showing it from the start.`, `RFC ${num} 没有 §${section}，下面从开头显示。`)}
           </div>
         )}
         {doc.state === "ready" && <RfcText doc={doc.data} section={section} bundled={bundled} onSection={(m, s) => navigate({ page: "rfc", n: m, section: s })} />}
       </div>
       {wide && (
         <aside className="rfc-right">
-          <div className="kicker">{section ? `§${section} 的引用` : `RFC ${num} 的引用`}</div>
-          <p className="muted">Go 源码注释里引用{section ? "这一节" : "这份 RFC 的任意章节"}：{section ? sites.length : anySites} 处</p>
+          <div className="kicker">{section ? t(`Cites of §${section}`, `§${section} 的引用`) : t(`Cites of RFC ${num}`, `RFC ${num} 的引用`)}</div>
+          <p className="muted">{t(`Go comments citing ${section ? "this section" : "any section of this RFC"}: ${section ? sites.length : anySites}`, `Go 源码注释里引用${section ? "这一节" : "这份 RFC 的任意章节"}：${section ? sites.length : anySites} 处`)}</p>
           {symbols &&
             sites.slice(0, 30).map(([fi, line], i) => (
               <a key={i} className="chip" href={href({ page: "code", path: symbols.files[fi], line })}>
@@ -138,9 +141,9 @@ export default function RfcPage({ n, section }: { n?: number; section?: string }
               </a>
             ))}
           <div className="kicker" style={{ marginTop: 16 }}>
-            工作台步骤
+            {t("Workbench steps", "工作台步骤")}
           </div>
-          {steps.length === 0 && <p className="muted">没有步骤直接引用{section ? "这一节" : "它"}。</p>}
+          {steps.length === 0 && <p className="muted">{t(section ? "No step cites this section directly." : "No step cites it directly.", section ? "没有步骤直接引用这一节。" : "没有步骤直接引用它。")}</p>}
           {steps.map((s) => (
             <a key={s.scenario + s.step + (s.sec ?? "")} className="rel-step" href={href({ page: "play", scenario: s.scenario, step: s.step })}>
               <span className="muted">

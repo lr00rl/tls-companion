@@ -1,18 +1,11 @@
-// Renders the Markdown notes in content/notes to JSON the notes reader loads:
+// Renders the Markdown notes in content/notes-en and content/notes to JSON:
 // HTML with heading anchors, Obsidian wikilinks resolved to site routes,
 // mermaid blocks left for the browser to draw, and per-section plain text for
 // search.
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import MarkdownIt from "markdown-it";
 
-const src = new URL("../content/notes/", import.meta.url).pathname;
-const out = new URL("../public/data/notes/", import.meta.url).pathname;
-mkdirSync(out, { recursive: true });
-
-// A note's id is its file-name prefix: 00, T01 ... T13, T99.
-const files = readdirSync(src).filter((f) => f.endsWith(".md")).sort();
 const idOf = (name) => name.replace(/\.md$/, "").split("_")[0];
-const byStem = new Map(files.map((f) => [f.replace(/\.md$/, ""), idOf(f)]));
 
 // slug turns a heading into the anchor Obsidian would link to: the text with
 // spaces as hyphens and most punctuation dropped.
@@ -26,15 +19,17 @@ export function slug(text) {
     .replace(/-+/g, "-");
 }
 
-function resolveWiki(target) {
+function resolveWiki(target, byStem, ids) {
   const [stem, heading] = target.split("#");
   if (!stem) return heading ? `#anchor:${slug(heading)}` : null;
   const base = stem.split("/").pop();
-  const id = byStem.get(base) ?? (byStem.has(stem) ? byStem.get(stem) : null);
+  const legacyId = base?.match(/^(?:00|T\d{2})(?=_|$)/)?.[0];
+  const id = byStem.get(base) ?? byStem.get(stem) ?? (legacyId && ids.has(legacyId) ? legacyId : null);
   if (!id) return null;
   return `#/notes/${id}${heading ? "/" + encodeURIComponent(slug(heading)) : ""}`;
 }
 
+function makeMd(byStem, ids, lang) {
 const md = new MarkdownIt({ html: false, linkify: true, typographer: false, breaks: true });
 
 md.renderer.rules.fence = (tokens, i) => {
@@ -50,13 +45,13 @@ md.renderer.rules.link_open = (tokens, i, opts, env, self) => {
   const t = tokens[i];
   const href = t.attrGet("href") ?? "";
   if (href.startsWith("wiki:")) {
-    const route = resolveWiki(decodeURIComponent(href.slice(5)));
+    const route = resolveWiki(decodeURIComponent(href.slice(5)), byStem, ids);
     if (route) {
       t.attrSet("href", route.startsWith("#anchor:") ? `#/notes/${env.id}/${encodeURIComponent(route.slice(8))}` : route);
     } else {
       t.attrSet("href", "#");
       t.attrSet("class", "wiki-missing");
-      t.attrSet("title", "这篇笔记在原始笔记库的其它目录里，没有收录到本站");
+      t.attrSet("title", lang === "zh" ? "这篇笔记在原始笔记库的其它目录里，没有收录到本站" : "This note is in another folder of the original vault and is not included here");
     }
   } else if (/^https?:/.test(href)) {
     t.attrSet("target", "_blank");
@@ -65,9 +60,9 @@ md.renderer.rules.link_open = (tokens, i, opts, env, self) => {
   return defaultLink(tokens, i, opts, env, self);
 };
 
-// Turn "RFC 8446 §4.1.3" and "RFC 8446 附录 D.4" in prose into links the
+// Turn "RFC 8446 §4.1.3" and "RFC 8446 Appendix D.4" in prose into links the
 // reader opens in its RFC drawer.
-const rfcMention = /RFC ?(\d{3,5})(?:\s*(?:§\s*|附录\s*|Section\s+)([A-Z](?:\.\d+)*|\d+(?:\.\d+)*))?/g;
+const rfcMention = /RFC ?(\d{3,5})(?:\s*(?:§\s*|附录\s*|Appendix\s*|Section\s+)([A-Z](?:\.\d+)*|\d+(?:\.\d+)*))?/g;
 md.core.ruler.push("rfc_links", (state) => {
   for (const block of state.tokens) {
     if (block.type !== "inline" || !block.children) continue;
@@ -116,7 +111,10 @@ md.renderer.rules.heading_open = (tokens, i, opts, env, self) => {
   return self.renderToken(tokens, i, opts);
 };
 
-function preprocess(text) {
+  return md;
+}
+
+function preprocess(text, lang) {
   return (
     text
       // Front matter.
@@ -129,7 +127,7 @@ function preprocess(text) {
         return `[${text.replace(/([[\]])/g, "\\$1")}](wiki:${encodeURIComponent(target.trim())})`;
       })
       // The old standalone companion page is this site now.
-      .replace(/`html\/index\.html`/g, "[本站工作台](#/play)")
+      .replace(/`html\/index\.html`/g, lang === "zh" ? "[本站工作台](#/play)" : "[the workbench](#/play)")
   );
 }
 
@@ -166,30 +164,43 @@ function sections(tokens, headings) {
   return out.map((s) => ({ ...s, text: s.text.replace(/\s+/g, " ").trim() }));
 }
 
-const index = [];
-for (const f of files) {
-  const raw = readFileSync(src + f, "utf8");
-  const id = idOf(f);
-  const fm = frontMatter(raw);
-  const env = { id, ids: new Set(), headings: [] };
-  const tokens = md.parse(preprocess(raw), env);
-  let html = md.renderer.render(tokens, md.options, env);
-  const h1 = env.headings.find((h) => h.level === 1);
-  html = html.replace(/^<h1[^>]*>[\s\S]*?<\/h1>\n/, "");
-  const headings = env.headings.filter((h) => h.level > 1);
-  const doc = {
-    id,
-    file: f,
-    title: h1 ? h1.text : f,
-    tags: fm.tags ?? [],
-    type: fm.type ?? "",
-    headings,
-    html,
-    search: sections(tokens, env.headings),
-    mermaid: (html.match(/<pre class="mermaid">/g) ?? []).length,
-  };
-  writeFileSync(`${out}${id}.json`, JSON.stringify(doc));
-  index.push({ id, file: f, title: doc.title, tags: doc.tags, headings, chars: raw.length });
+function build(srcDir, outDir, lang) {
+  const src = new URL(srcDir, import.meta.url).pathname;
+  const out = new URL(outDir, import.meta.url).pathname;
+  mkdirSync(out, { recursive: true });
+  const files = readdirSync(src).filter((f) => f.endsWith(".md")).sort();
+  const byStem = new Map(files.map((f) => [f.replace(/\.md$/, ""), idOf(f)]));
+  const ids = new Set(byStem.values());
+  const md = makeMd(byStem, ids, lang);
+  const index = [];
+  for (const f of files) {
+    const raw = readFileSync(src + f, "utf8");
+    const id = idOf(f);
+    const fm = frontMatter(raw);
+    const env = { id, ids: new Set(), headings: [] };
+    const tokens = md.parse(preprocess(raw, lang), env);
+    let html = md.renderer.render(tokens, md.options, env);
+    const h1 = env.headings.find((h) => h.level === 1);
+    html = html.replace(/^<h1[^>]*>[\s\S]*?<\/h1>\n/, "");
+    const headings = env.headings.filter((h) => h.level > 1);
+    const doc = {
+      id,
+      file: f,
+      title: h1 ? h1.text : f,
+      tags: fm.tags ?? [],
+      type: fm.type ?? "",
+      headings,
+      html,
+      search: sections(tokens, env.headings),
+      mermaid: (html.match(/<pre class="mermaid">/g) ?? []).length,
+    };
+    writeFileSync(`${out}${id}.json`, JSON.stringify(doc));
+    index.push({ id, file: f, title: doc.title, tags: doc.tags, headings, chars: raw.length });
+  }
+  writeFileSync(`${out}index.json`, JSON.stringify(index));
+  console.log(`built ${index.length} ${lang} notes`);
 }
-writeFileSync(`${out}index.json`, JSON.stringify(index));
-console.log(`built ${index.length} notes`);
+
+// English is the default the site loads. Chinese is the other edition.
+build("../content/notes-en/", "../public/data/notes/", "en");
+build("../content/notes/", "../public/data/notes/zh/", "zh");

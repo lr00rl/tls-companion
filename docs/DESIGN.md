@@ -14,8 +14,8 @@ its event log), records and messages (what crossed the wire), fields (byte
 ranges inside a message), symbols (Go declarations), secrets (key schedule
 nodes), notes sections, RFC sections, and history entries.
 
-Top-level areas are peers in a persistent bar: 握手 (workbench), 源码 (code
-browser), 笔记 (notes), 演进 (history), 规范 (RFCs). Search (`/` or `Ctrl K`)
+Top-level areas are peers in a persistent bar: Handshake, Code, Notes,
+History, RFCs. Search (`/` or `Ctrl K`)
 spans all of them. Every view is a hash route, so refresh, share, and the
 browser's back button all work. Code navigation pushes history entries, step
 changes replace the current one.
@@ -67,7 +67,7 @@ face. Noto Serif SC is the display face, used only for page and note headings.
 
 Layout at 1440: step rail (320px) | stage over inspector | code over trace. At
 900 to 1279 the rail folds into the transport bar. Below 900 it is one column
-with the stage on top and a bottom tab bar for 步骤, 报文, 源码, 调用, 密钥.
+with the stage on top and a bottom tab bar for Steps, Packet, Code, Calls, and Keys.
 
 Motion: UI transitions are 140ms ease-out. The stage clock (time in RTT units)
 is eased toward its target by an rAF loop at constant speed with a capped

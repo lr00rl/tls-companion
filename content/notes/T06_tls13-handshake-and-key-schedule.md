@@ -6,7 +6,7 @@ status: done
 
 # T06 · TLS 1.3 握手与密钥调度逐包拆解
 
-> 系列：[[00_TLS系列总览与学习路线|TLS 系列总览]] · 上一篇：[[T05_TCP三次握手与TLS12握手逐包拆解|T05 TCP 与 TLS 1.2 握手]] · 下一篇：[[T07_会话恢复_0-RTT与握手性能优化|T07 会话恢复与 0-RTT]]
+> 系列：[[00_tls-series-overview|TLS 系列总览]] · 上一篇：[[T05_tcp-and-tls12-handshake|T05 TCP 与 TLS 1.2 握手]] · 下一篇：[[T07_session-resumption-0-rtt-and-performance|T07 会话恢复与 0-RTT]]
 > 前置知识：T02 的 HKDF、AEAD、ECDH、签名；T05 的 TLS 1.2 握手结构（本篇处处和它对照）。
 > 主要标准：RFC 8446（TLS 1.3）及其修订版 RFC 9846（2026-07，取代 RFC 8446，本篇章节号按 RFC 8446 标注）、RFC 8701（GREASE）、RFC 10024（混合后量子密钥交换，2026）
 > 整理日期：2026-10-16（文中握手为 2026-10-17 03:00 UTC 对 www.cloudflare.com 的真实抓取，OpenSSL 4.0.3 `-trace` 和 `-keylogfile`）
@@ -88,7 +88,7 @@ TLS 1.3 的大部分协商都在扩展里，下表是这次 ClientHello 里出�
 | 扩展 | 码点 | 作用 | 这次的取值 |
 | --- | --- | --- | --- |
 | supported_versions | 43 | 真正的版本协商 | TLS 1.3 |
-| supported_groups | 10 | 支持的密钥交换群，按偏好排序 | 混合后量子三个，经典七个 |
+| supported_groups | 10 | 支持的密钥交换群，按偏好排序 | 混合后量子三个，经典八个 |
 | key_share | 51 | 预先发送的临时公钥，可以有多个 | X25519MLKEM768（1216 字节）和 X25519（32 字节） |
 | signature_algorithms | 13 | 能验证的握手签名算法 | 包括 ML-DSA、ECDSA、EdDSA、RSA-PSS、SM2 |
 | signature_algorithms_cert | 50 | 证书链里能接受的签名算法（不发则同上） | 未发送 |
@@ -114,7 +114,7 @@ key_share（RFC 8446 §4.2.8）是 TLS 1.3 能做到 1-RTT 的关键。客户端
 | secp256r1 | 0x0017 | 65 字节（非压缩点 04 加 x 加 y） | 65 字节 |
 | X25519MLKEM768 | 0x11EC（4588） | 1216 字节 = ML-KEM-768 封装公钥 1184 + X25519 公钥 32 | 1120 字节 = ML-KEM-768 密文 1088 + X25519 公钥 32 |
 
-这次 OpenSSL 一共发了两个 key_share：一个混合后量子的 X25519MLKEM768，一个经典的 X25519，前者如果服务器不支持，还有后者兜底，避免多一个往返。代价是 ClientHello 变成了 1469 字节，超过了一个以太网 TCP 段（MSS 通常是 1460 字节）能装下的数据，ClientHello 要分两个 TCP 段发出。一些中间设备假设 ClientHello 一定在一个包里，遇到分段的就出错，这是后量子迁移遇到的实际问题之一（见 [[T10_后量子TLS_ML-KEM混合密钥交换与MTC|T10]]）。
+这次 OpenSSL 一共发了两个 key_share：一个混合后量子的 X25519MLKEM768，一个经典的 X25519，前者如果服务器不支持，还有后者兜底，避免多一个往返。代价是 ClientHello 变成了 1469 字节，超过了一个以太网 TCP 段（MSS 通常是 1460 字节）能装下的数据，ClientHello 要分两个 TCP 段发出。一些中间设备假设 ClientHello 一定在一个包里，遇到分段的就出错，这是后量子迁移遇到的实际问题之一（见 [[T10_post-quantum-tls|T10]]）。
 
 如果客户端的猜测都没中（服务器支持客户端列出的某个群，但客户端没有为它发 key_share），服务器会回 HelloRetryRequest，下面单独讲。
 
@@ -135,7 +135,7 @@ ServerHello, Length=1206
 
 ServerHello 是最后一条明文的握手消息。它只携带协商密钥所必需的三个扩展：supported_versions（选定 TLS 1.3）、key_share（服务器自己的临时公钥，这里是 1088 字节的 ML-KEM 密文加 32 字节 X25519 公钥），以及恢复时的 pre_shared_key（选中了哪一个 PSK）。其他所有扩展的回应，比如 ALPN 选了什么、SNI 是否被接受，都放进了随后加密的 EncryptedExtensions。这个划分（RFC 8446 §4.2 的扩展位置表）是 TLS 1.3 隐私改进的一部分：能加密的都加密，明文里只留计算密钥必需的东西。
 
-服务器发出 ServerHello 时，已经有了双方的公钥，可以算出共享秘密。对 X25519MLKEM768，共享秘密是两部分的拼接：ML-KEM 解封装得到的 32 字节加上 X25519 算出的 32 字节，一共 64 字节，作为密钥调度里 Handshake Secret 那一步的输入。只要两个算法里有一个没被攻破，共享秘密就是安全的，这就是"混合"的意义。
+服务器发出 ServerHello 时，已经有了双方的公钥，可以算出共享秘密。对 X25519MLKEM768，共享秘密是两部分的拼接：ML-KEM 的 32 字节共享秘密（服务器通过封装得到，客户端通过解封装得到）加上 X25519 算出的 32 字节，一共 64 字节，作为密钥调度里 Handshake Secret 那一步的输入。只要两个算法里有一个没被攻破，共享秘密就是安全的，这就是"混合"的意义。
 
 ### 降级保护：random 末尾的哨兵
 
@@ -167,7 +167,7 @@ CF 21 AD 74 E5 9A 61 11 BE 1D 8C 02 1E 65 B8 91
 C2 A2 11 16 7A BB 8C 5E 07 9E 09 E2 C8 A8 33 9C
 ```
 
-HRR 的 key_share 扩展里只有一个群编号，告诉客户端"请用这个群重发"。客户端用同样的参数、换上对应的 key_share 重发 ClientHello。代价是多一个往返。为了让转录哈希保持固定长度，第一个 ClientHello 在转录里被替换成一条合成的 message_hash 消息，内容是它的哈希值。
+HRR 的 key_share 扩展里只有一个群编号，告诉客户端"请用这个群重发"。客户端用同样的参数、换上对应的 key_share 重发 ClientHello。代价是多一个往返。第一个 ClientHello 在转录里被替换成一条合成的 message_hash 消息，内容是它的哈希值。这样服务器可以发出无状态的 HRR：只需在 cookie 里保存第一个 ClientHello 的哈希，而不必保存整个中间哈希状态（§4.4.1）。
 
 ```mermaid
 sequenceDiagram
@@ -363,7 +363,7 @@ EXPORTER_SECRET                  3337a9b0e3eae7de...  1560030e8c5c9e09...  （48
 PSK = HKDF-Expand-Label(resumption_master_secret, "resumption", ticket_nonce, Hash.length)
 ```
 
-这次服务器一口气发了两张票据，nonce 分别是 `00` 和 `01`，因此对应两个不同的 PSK。服务器常这样做，是为了让客户端可以把每张票据只用一次，减少同一张票据在多个连接里出现而被关联的可能。恢复握手怎么使用这个 PSK，以及 binder_key 和 0-RTT 的细节，在 [[T07_会话恢复_0-RTT与握手性能优化|T07]]。
+这次服务器一口气发了两张票据，nonce 分别是 `00` 和 `01`，因此对应两个不同的 PSK。服务器常这样做，是为了让客户端可以把每张票据只用一次，减少同一张票据在多个连接里出现而被关联的可能。恢复握手怎么使用这个 PSK，以及 binder_key 和 0-RTT 的细节，在 [[T07_session-resumption-0-rtt-and-performance|T07]]。
 
 ### 导出器与密钥更新
 
@@ -424,7 +424,7 @@ zeros 填充让发送方可以把记录补到任意长度，隐藏真实内容�
 ```
 NewSessionTicket, Length=210
   ticket_lifetime_hint=64800          秒，即 18 小时；规范上限 604800 秒（7 天）
-  ticket_age_add=1424153705           随机数，客户端报告票据年龄时要加上它，防止被动观察者据此关联连接
+  ticket_age_add=1424153705           客户端报告票据年龄时加上的随机数；它混淆数值年龄，但不隐藏同一票据身份的复用
   ticket_nonce (len=1): 00            用于从 resumption_master_secret 派生这张票据的 PSK
   ticket (len=192): 8A8BC9AE...       服务器加密的会话状态，对客户端不透明
   extensions: UNKNOWN(47802)          0xBABA，GREASE 值

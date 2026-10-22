@@ -6,7 +6,7 @@ status: done
 
 # T04 · 从 SSL 到 TLS 1.3：协议演进与攻击史
 
-> 系列：[[00_TLS系列总览与学习路线|TLS 系列总览]] · 上一篇：[[T03_证书与PKI_信任从哪里来|T03 证书与 PKI]] · 下一篇：[[T05_TCP三次握手与TLS12握手逐包拆解|T05 TCP 与 TLS 1.2 握手]]
+> 系列：[[00_tls-series-overview|TLS 系列总览]] · 上一篇：[[T03_certificates-and-pki|T03 证书与 PKI]] · 下一篇：[[T05_tcp-and-tls12-handshake|T05 TCP 与 TLS 1.2 握手]]
 > 前置知识：T02 的 CBC、MAC、RSA 填充、DH 概念。
 > 主要标准：RFC 6101（SSL 3.0）、RFC 6176（禁用 SSL 2.0）、RFC 7568（废弃 SSL 3.0）、RFC 2246（TLS 1.0）、RFC 4346（TLS 1.1）、RFC 5246（TLS 1.2）、RFC 8446（TLS 1.3）、RFC 8996（废弃 TLS 1.0 与 1.1）、RFC 7457（已知攻击综述）、RFC 5746、RFC 7465、RFC 7507、RFC 7627
 > 整理日期：2026-10-16
@@ -75,7 +75,7 @@ TLS 1.3 从 2014 年开始设计，草案从 draft-ietf-tls-tls13-00 一直修�
 
 新增的东西同样针对具体问题：所有密钥交换都是临时的，前向保密成为默认；ServerHello 之后的所有握手消息都加密，证书不再明文暴露；服务器对整个握手转录签名（CertificateVerify），而不只是对密钥交换参数签名；密钥派生改用 HKDF，每个用途一把独立的密钥；ServerHello.random 里嵌入降级哨兵，防止被迫协商旧版本；支持 0-RTT 早期数据（带着明确的重放风险说明）。
 
-TLS 1.3 的部署过程本身也是一段历史。最初的草案沿用新的版本号，结果大量中间设备（企业防火墙、杀毒软件、负载均衡）看到不认识的版本就断开连接，这种现象叫协议僵化（ossification）。2017 年 Chrome 和 Firefox 的实验发现失败率高到无法上线。最终的方案是伪装：ClientHello 的 legacy_version 固定写 TLS 1.2 的 0x0303，真实版本放在 supported_versions 扩展里；还要求发送一条无意义的 ChangeCipherSpec 记录、回显 session_id，让握手在中间设备眼里"看起来像 TLS 1.2 的会话恢复"，这叫中间设备兼容模式（RFC 8446 附录 D.4）。GREASE（RFC 8701）也是在这个背景下提出的：客户端随机插入一些保留的无意义值，逼着服务器和中间设备正确地忽略不认识的值，防止将来再次僵化。
+TLS 1.3 的部署过程本身也是一段历史。最初的草案沿用新的版本号，结果大量中间设备（企业防火墙、杀毒软件、负载均衡）看到不认识的版本就断开连接，这种现象叫协议僵化（ossification）。2017 年 Chrome 和 Firefox 的实验发现失败率高到无法上线。最终的方案是伪装：ClientHello 的 legacy_version 固定写 TLS 1.2 的 0x0303，真实版本放在 supported_versions 扩展里；双方还各发一条无意义的 ChangeCipherSpec 记录，服务器回显客户端发来的非空 session_id，让握手在中间设备眼里"看起来像 TLS 1.2 的会话恢复"，这叫中间设备兼容模式（RFC 8446 附录 D.4）。GREASE（RFC 8701）也是在这个背景下提出的：客户端随机插入一些保留的无意义值，逼着服务器和中间设备正确地忽略不认识的值，防止将来再次僵化。
 
 ## 攻击史
 
@@ -115,7 +115,7 @@ timeline
 
 ### 2013：Lucky Thirteen
 
-机制：MAC-then-Encrypt 的 CBC 记录，接收方要先解密、去掉填充、再计算 MAC。填充长度不同，参与 MAC 计算的数据长度不同，计算时间就有微小差异。Nadhem AlFardan 和 Kenny Paterson 证明这个时间差足以构成填充预言机，在理想条件下逐字节恢复明文。名字来自 TLS 记录头里参与 MAC 计算的 13 个字节。影响：几乎所有 TLS 实现的 CBC 套件。修复：各实现改写为真正恒定时间的 CBC 解密代码，这非常难写对；根本的修复是 AEAD。
+机制：MAC-then-Encrypt 的 CBC 记录，接收方要先解密、去掉填充、再计算 MAC。填充长度不同，参与 MAC 计算的数据长度不同，计算时间就有微小差异。Nadhem AlFardan 和 Kenny Paterson 证明这个时间差足以构成填充预言机，在理想条件下逐字节恢复明文。名字来自参与 MAC 计算的 13 个字节头部数据（8 字节序号加 5 字节记录头）。影响：几乎所有 TLS 实现的 CBC 套件。修复：各实现改写为真正恒定时间的 CBC 解密代码，这非常难写对；根本的修复是 AEAD。
 
 ### 2013 至 2015：RC4 的偏差
 

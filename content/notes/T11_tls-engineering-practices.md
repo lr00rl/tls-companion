@@ -6,7 +6,7 @@ status: done
 
 # T11 · 各大厂的 TLS 工程实践
 
-> 系列：[[00_TLS系列总览与学习路线|TLS 系列总览]] · 上一篇：[[T10_后量子TLS_ML-KEM混合密钥交换与MTC|T10 后量子 TLS]] · 下一篇：[[T12_HTTPS推广与信任治理|T12 HTTPS 推广与信任治理]]
+> 系列：[[00_tls-series-overview|TLS 系列总览]] · 上一篇：[[T10_post-quantum-tls|T10 后量子 TLS]] · 下一篇：[[T12_https-adoption-and-trust-governance|T12 HTTPS 推广与信任治理]]
 > 前置知识：T03 到 T10 的大部分内容，这一篇把前面的机制和"谁做的、为什么做"对应起来。
 > 主要资料：各公司的开源仓库、官方博客与文档、相关 RFC 的作者信息；国密部分以 RFC 8998 和 GB/T 38636-2020 为准
 > 整理日期：2026-10-16

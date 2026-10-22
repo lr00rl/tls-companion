@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from "react";
+import { tx } from "../i18n/lang";
 import { href } from "./route";
 
 // Keeps a render error inside one page so the top bar stays usable. Navigating
@@ -20,11 +21,11 @@ export class ErrorBoundary extends Component<{ resetKey: string; children: React
     if (!error) return this.props.children;
     return (
       <div className="empty app-crash">
-        <strong>这个页面出错了</strong>
+        <strong>{tx("This page hit an error", "这个页面出错了")}</strong>
         {error.message}
         <div>
           <a className="btn outline" href={href({ page: "home" })}>
-            回到首页
+            {tx("Back to home", "回到首页")}
           </a>
         </div>
       </div>

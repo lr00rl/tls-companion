@@ -6,7 +6,7 @@ status: done
 
 # T10 · 后量子 TLS：ML-KEM 混合密钥交换与 Merkle Tree Certificates
 
-> 系列：[[00_TLS系列总览与学习路线|TLS 系列总览]] · 上一篇：[[T09_QUIC与HTTP3_把TLS放进传输层|T09 QUIC 与 HTTP/3]] · 下一篇：[[T11_各大厂的TLS工程实践|T11 各大厂的 TLS 工程实践]]
+> 系列：[[00_tls-series-overview|TLS 系列总览]] · 上一篇：[[T09_quic-and-http3|T09 QUIC 与 HTTP/3]] · 下一篇：[[T11_tls-engineering-practices|T11 各大厂的 TLS 工程实践]]
 > 前置知识：T02 的 DH、签名和安全强度，T06 的 key_share 与密钥调度，T03 的证书链与证书透明度。
 > 主要标准：FIPS 203（ML-KEM）、FIPS 204（ML-DSA）、FIPS 205（SLH-DSA）、RFC 10024（TLS 1.3 的混合后量子密钥协商，2026，草案名 draft-ietf-tls-ecdhe-mlkem）、draft-ietf-tls-mlkem（纯 ML-KEM，在 RFC Editor 队列）、draft-ietf-tls-mldsa（ML-DSA 用于 TLS，在 RFC Editor 队列）、IETF PLANTS 工作组的 Merkle Tree Certificates 草案
 > 整理日期：2026-10-16（标准状态于 2026-10-17 在 IETF datatracker 与 RFC Editor 核对；文中握手数据来自 T06、T07 的真实抓取）
@@ -57,7 +57,7 @@ NIST 在 2016 年发起后量子密码标准征集，经过三轮公开评选，
 
 ## ML-KEM 的数学直觉
 
-ML-KEM 的安全性建立在带错误学习（Learning With Errors，LWE）问题上。先看一个没有错误的版本：给定一个公开矩阵 A 和向量 b = A·s，求秘密向量 s。这就是解线性方程组，高斯消元一下就出来了。LWE 在每个方程上加了一个很小的随机误差 e：b = A·s + e (mod q)。就是这一点小误差，让问题在高维时变得极其困难，目前没有已知的经典或量子算法能高效求解，它还可以归约到格上的最坏情况问题。
+ML-KEM 的安全性建立在带错误学习（Learning With Errors，LWE）问题上。先看一个没有错误的版本：给定一个公开矩阵 A 和向量 b = A·s，求秘密向量 s。这就是解线性方程组，高斯消元一下就出来了。LWE 在每个方程上加了一个很小的随机误差 e：b = A·s + e (mod q)。就是这一点小误差，让问题在高维时变得极其困难，目前没有已知的经典或量子算法能高效求解。它的困难性还有归约保证：格上某些问题的最坏情况可以归约到 LWE，也就是说，解 LWE 至少和在最坏情况下解这些格问题一样难。
 
 一个小数字例子，取模数 q = 97，二维：
 
@@ -104,7 +104,7 @@ Encaps(ek)      -> (ss, ct)        用对方的 ek 生成共享秘密 ss 和密�
 Decaps(dk, ct)  -> ss              用自己的 dk 从 ct 恢复同一个 ss
 ```
 
-DH 是对称的：双方各出一个公钥，各自用自己的私钥和对方的公钥算出同一个秘密。KEM 是不对称的：只有一方有密钥对，另一方用对方的公钥"封装"一个随机秘密发回去。好在 TLS 1.3 的 key_share 流程正好能容纳这种不对称：客户端在 ClientHello 的 key_share 里放 ek，服务器收到后执行 Encaps，把密文 ct 放进 ServerHello 的 key_share，客户端执行 Decaps。不需要增加任何往返。ML-KEM 在 Kyber 的基础上用 Fujisaki-Okamoto 变换获得了选择密文安全（IND-CCA2），所以理论上同一个 ek 可以安全地复用，但 TLS 仍然每次握手生成新的密钥对，保持前向保密。
+DH 是对称的：双方各出一个公钥，各自用自己的私钥和对方的公钥算出同一个秘密。KEM 是不对称的：只有一方有密钥对，另一方用对方的公钥"封装"一个随机秘密发回去。好在 TLS 1.3 的 key_share 流程正好能容纳这种不对称：客户端在 ClientHello 的 key_share 里放 ek，服务器收到后执行 Encaps，把密文 ct 放进 ServerHello 的 key_share，客户端执行 Decaps。不需要增加任何往返。ML-KEM 和它的前身 Kyber 一样，对底层的公钥加密方案施加 Fujisaki-Okamoto 变换，获得选择密文安全（IND-CCA2），所以理论上同一个 ek 可以安全地复用，但 TLS 仍然每次握手生成新的密钥对，保持前向保密。
 
 ## 混合密钥交换：X25519MLKEM768
 

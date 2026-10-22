@@ -54,21 +54,21 @@ type scenario struct {
 
 var scenarios = []scenario{
 	{
-		ID: "tls13-full", Title: "TLS 1.3 完整握手", Brief: "X25519MLKEM768 混合密钥交换，ECDSA 证书链，1-RTT，随后一次 HTTP/1.1 请求和会话票据",
+		ID: "tls13-full", Title: "TLS 1.3 full handshake", Brief: "X25519MLKEM768 hybrid key exchange, an ECDSA chain, 1-RTT, then one HTTP/1.1 request and a session ticket",
 		client: func(p *pki, c *tls.Config) { c.ClientSessionCache = tls.NewLRUClientSessionCache(4) },
 		check: func(c, s tls.ConnectionState) error {
 			return want(c.Version == tls.VersionTLS13 && c.CurveID == tls.X25519MLKEM768 && !c.DidResume, "TLS 1.3 with X25519MLKEM768", c)
 		},
 	},
 	{
-		ID: "tls13-hrr", Title: "TLS 1.3 HelloRetryRequest", Brief: "服务器只接受 P-256，客户端猜的 key_share 落空，多花一个往返重发 ClientHello",
+		ID: "tls13-hrr", Title: "TLS 1.3 HelloRetryRequest", Brief: "The server accepts only P-256, the guessed key_share misses, and a second ClientHello costs a round trip",
 		server: func(p *pki, c *tls.Config) { c.CurvePreferences = []tls.CurveID{tls.CurveP256} },
 		check: func(c, s tls.ConnectionState) error {
 			return want(c.Version == tls.VersionTLS13 && c.CurveID == tls.CurveP256 && c.HelloRetryRequest, "TLS 1.3 HRR to P-256", c)
 		},
 	},
 	{
-		ID: "tls13-resume", Title: "TLS 1.3 PSK 会话恢复", Brief: "用上一条连接收到的 NewSessionTicket 恢复会话，psk_dhe_ke 模式，不再发送证书",
+		ID: "tls13-resume", Title: "TLS 1.3 PSK resumption", Brief: "Resumes with the NewSessionTicket from the previous connection, psk_dhe_ke, and sends no certificate",
 		prime:  true,
 		client: func(p *pki, c *tls.Config) { c.ClientSessionCache = tls.NewLRUClientSessionCache(4) },
 		check: func(c, s tls.ConnectionState) error {
@@ -76,7 +76,7 @@ var scenarios = []scenario{
 		},
 	},
 	{
-		ID: "tls12-ecdhe", Title: "TLS 1.2 ECDHE 握手", Brief: "ECDHE_ECDSA_WITH_AES_128_GCM_SHA256，X25519，扩展主密钥，2-RTT",
+		ID: "tls12-ecdhe", Title: "TLS 1.2 ECDHE handshake", Brief: "ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, X25519, extended master secret, 2-RTT",
 		client: func(p *pki, c *tls.Config) {
 			c.MaxVersion = tls.VersionTLS12
 			c.CipherSuites = []uint16{tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256}
@@ -87,7 +87,7 @@ var scenarios = []scenario{
 		},
 	},
 	{
-		ID: "tls12-rsa", Title: "TLS 1.2 RSA 密钥传输", Brief: "TLS_RSA_WITH_AES_128_GCM_SHA256：预主密钥用服务器公钥加密传输，没有前向保密",
+		ID: "tls12-rsa", Title: "TLS 1.2 RSA key transport", Brief: "TLS_RSA_WITH_AES_128_GCM_SHA256: the premaster secret is encrypted to the server public key, with no forward secrecy",
 		rsa: true,
 		client: func(p *pki, c *tls.Config) {
 			c.MaxVersion = tls.VersionTLS12

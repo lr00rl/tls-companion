@@ -1,6 +1,7 @@
 // Rebuilds the key schedule tree from the secrets one endpoint derived. Every
 // value here was reported by crypto/tls itself through the instrumented HKDF
 // and PRF primitives; nothing is recomputed.
+import { tx } from "../i18n/lang";
 import type { Capture, SecretEvent, Side } from "../data/types";
 import type { Epoch } from "./model";
 
@@ -39,9 +40,13 @@ const expandNames: Record<string, string> = {
   key: "key",
   iv: "iv",
   finished: "finished_key",
-  resumption: "PSK（给下次恢复用）",
-  "traffic upd": "下一代 traffic_secret",
 };
+
+function expandName(label: string): string {
+  if (label === "resumption") return tx("PSK (for the next resumption)", "PSK（给下次恢复用）");
+  if (label === "traffic upd") return tx("next traffic_secret", "下一代 traffic_secret");
+  return expandNames[label] ?? label;
+}
 
 const prfNames: Record<string, string> = {
   "extended master secret": "master_secret",
@@ -67,9 +72,15 @@ export function buildKeyTree(cap: Capture, side: Side): KeyNode[] {
         extracts++;
         node.name = stage;
         parent = byValue.get(s.in1);
-        node.inputs.push({ name: "salt", value: s.in1 || "（空，按 0 处理）" });
+        node.inputs.push({ name: "salt", value: s.in1 || tx("(empty, taken as zeros)", "（空，按 0 处理）") });
         const ikmName =
-          stage === "Early Secret" ? (zero(s.in2) ? "IKM：无 PSK，全零" : "IKM：PSK") : stage === "Handshake Secret" ? `IKM：(EC)DHE 共享秘密，${s.in2.length / 2} 字节` : "IKM：全零";
+          stage === "Early Secret"
+            ? zero(s.in2)
+              ? tx("IKM: no PSK, all zeros", "IKM：无 PSK，全零")
+              : tx("IKM: PSK", "IKM：PSK")
+            : stage === "Handshake Secret"
+              ? tx(`IKM: (EC)DHE shared secret, ${s.in2.length / 2} bytes`, `IKM：(EC)DHE 共享秘密，${s.in2.length / 2} 字节`)
+              : tx("IKM: all zeros", "IKM：全零");
         node.inputs.push({ name: ikmName, value: s.in2 });
         break;
       }
@@ -78,11 +89,11 @@ export function buildKeyTree(cap: Capture, side: Side): KeyNode[] {
         node.name = n;
         node.epoch = ep;
         parent = byValue.get(s.in1);
-        node.inputs.push({ name: s.label === "derived" ? "Transcript-Hash(\"\")" : "Transcript-Hash（到此为止的握手消息）", value: s.in2 });
+        node.inputs.push({ name: s.label === "derived" ? 'Transcript-Hash("")' : tx("Transcript-Hash (handshake messages so far)", "Transcript-Hash（到此为止的握手消息）"), value: s.in2 });
         break;
       }
       case "HKDF-Expand-Label": {
-        node.name = expandNames[s.label] ?? s.label;
+        node.name = expandName(s.label);
         parent = byValue.get(s.in1);
         if (s.in2) node.inputs.push({ name: "context", value: s.in2 });
         if (parent?.epoch) node.epoch = parent.epoch;
@@ -92,7 +103,10 @@ export function buildKeyTree(cap: Capture, side: Side): KeyNode[] {
         node.name = prfNames[s.label] ?? s.label;
         parent = byValue.get(s.in1);
         node.inputs.push({ name: parent ? "secret" : "pre_master_secret", value: s.in1 });
-        node.inputs.push({ name: s.label === "key expansion" ? "seed：server_random ‖ client_random" : s.label.includes("master") ? "seed：会话哈希" : "seed：握手哈希", value: s.in2 });
+        node.inputs.push({
+          name: s.label === "key expansion" ? tx("seed: server_random ‖ client_random", "seed：server_random ‖ client_random") : s.label.includes("master") ? tx("seed: session hash", "seed：会话哈希") : tx("seed: handshake hash", "seed：握手哈希"),
+          value: s.in2,
+        });
         if (s.label === "key expansion") node.children.push(...splitKeyBlock(s, i));
         if (s.label.includes("master")) node.epoch = "app";
         break;

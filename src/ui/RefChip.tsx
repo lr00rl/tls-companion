@@ -1,3 +1,4 @@
+import { useLang } from "../i18n/lang";
 import { navigate } from "../app/route";
 import { usePeek } from "../app/peek";
 import { useWB } from "../app/store";
@@ -6,7 +7,8 @@ import type { StepRef } from "../scenarios/types";
 
 /** A link to an RFC section, a note heading, or a Go symbol. */
 export function RefChip({ r }: { r: StepRef }) {
-  const notes = useLoad("notes", load.notes);
+  const lang = useLang();
+  const notes = useLoad(`notes:${lang}`, () => load.notes(lang));
   const rfcs = useLoad("rfcs", load.rfcs);
   if ("rfc" in r) {
     const doc = rfcs.state === "ready" ? rfcs.data.find((d) => d.n === r.rfc) : undefined;
@@ -31,7 +33,7 @@ export function RefChip({ r }: { r: StepRef }) {
   }
   const name = r.sym.replace(/^crypto\/(internal\/fips140\/)?/, "");
   return (
-    <button className="chip" title={r.sym} onClick={() => void useWB.getState().openSymbol(r.sym, { reason: "参考符号" })}>
+    <button className="chip" title={r.sym} onClick={() => void useWB.getState().openSymbol(r.sym, { reason: ["Referenced symbol", "参考符号"] })}>
       <span className="k">Go</span>
       {r.label ?? name}
     </button>

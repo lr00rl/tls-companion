@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { href, navigate } from "../app/route";
 import { useWB, type MobilePane } from "../app/store";
-import { defaultScenario, scenarioById, scenarioDefs } from "../scenarios";
-import { load, useLoad } from "../data/load";
+import { scenarioFor, scenariosFor } from "../i18n/content";
+import { useLang, useTx } from "../i18n/lang";
+import { defaultScenario, scenarioById } from "../scenarios";
 import type { ScenarioDef } from "../scenarios/types";
 import { trapTab } from "../ui/focus";
 import { Splitter } from "../ui/Splitter";
@@ -16,8 +17,10 @@ import { Transport } from "./Transport";
 import "./workbench.css";
 
 export function Workbench({ scenario, step }: { scenario?: string; step?: number }) {
+  const lang = useLang();
+  const t = useTx();
   const id = scenario && scenarioById.has(scenario) ? scenario : defaultScenario;
-  const def = scenarioById.get(id)!;
+  const def = scenarioFor(lang, id)!;
   const loading = useWB((s) => s.loading);
   const loadError = useWB((s) => s.loadError);
   const model = useWB((s) => s.model);
@@ -40,11 +43,11 @@ export function Workbench({ scenario, step }: { scenario?: string; step?: number
   if (loadError)
     return (
       <div className="empty wb-error">
-        <strong>场景数据加载失败</strong>
+        <strong>{t("Could not load this scenario", "场景数据加载失败")}</strong>
         {loadError}
         <div>
           <button className="btn outline" onClick={() => void useWB.getState().open(id, step)}>
-            重试
+            {t("Retry", "重试")}
           </button>
         </div>
       </div>
@@ -68,9 +71,10 @@ function DesktopLayout({ tcp, wide, defId }: { tcp: boolean; wide: boolean; defI
   // folded under 720px tall, so the inspector keeps room.
   const [cardPref, setCardOpen] = usePref<boolean | null>("wb.card", null);
   const [drawer, setDrawer] = useState(false);
+  const t = useTx();
   const step = useWB((s) => s.step);
   const steps = useWB((s) => s.steps);
-  const def = scenarioById.get(defId)!;
+  const def = scenarioFor(useLang(), defId)!;
   // The stored stage height is a preference; the window caps it so the
   // inspector below always keeps room (about 470px for the top bar, the
   // transport, and the inspector, plus the step card when the rail is folded).
@@ -86,7 +90,7 @@ function DesktopLayout({ tcp, wide, defId }: { tcp: boolean; wide: boolean; defI
           <aside className="wb-rail" style={{ width: rail }}>
             <StepRail def={def} />
           </aside>
-          <Splitter axis="x" value={rail} min={260} max={520} onChange={setRail} label="调整步骤栏宽度" />
+          <Splitter axis="x" value={rail} min={260} max={520} onChange={setRail} label={t("Resize the step list", "调整步骤栏宽度")} />
         </>
       )}
       <div className="wb-center">
@@ -94,12 +98,12 @@ function DesktopLayout({ tcp, wide, defId }: { tcp: boolean; wide: boolean; defI
           <div className="step-card">
             <div className="step-card-head">
               <button className="btn outline" onClick={() => setDrawer(true)}>
-                全部步骤
+                {t("All steps", "全部步骤")}
               </button>
               <strong>{steps[step]?.title}</strong>
               <span className="spacer" />
               <button className="btn" onClick={() => setCardOpen(!cardOpen)} aria-expanded={cardOpen} aria-controls="step-card-body">
-                {cardOpen ? "收起说明" : "展开说明"}
+                {cardOpen ? t("Hide note", "收起说明") : t("Show note", "展开说明")}
               </button>
             </div>
             {cardOpen && (
@@ -112,17 +116,17 @@ function DesktopLayout({ tcp, wide, defId }: { tcp: boolean; wide: boolean; defI
         <div className="wb-stage" style={{ height: stageShown }}>
           <Stage tcp={tcp} />
         </div>
-        <Splitter axis="y" value={stageShown} min={220} max={stageMax} onChange={setStageH} label="调整时序图高度" />
+        <Splitter axis="y" value={stageShown} min={220} max={stageMax} onChange={setStageH} label={t("Resize the sequence diagram", "调整时序图高度")} />
         <div className="wb-inspector">
           <Inspector />
         </div>
       </div>
-      <Splitter axis="x" value={right} min={360} max={1000} dir={-1} onChange={setRight} label="调整代码栏宽度" />
+      <Splitter axis="x" value={right} min={360} max={1000} dir={-1} onChange={setRight} label={t("Resize the code panel", "调整代码栏宽度")} />
       <div className="wb-right" style={{ width: right }}>
         <div className="wb-code">
           <CodePanel />
         </div>
-        <Splitter axis="y" value={traceH} min={120} max={600} dir={-1} onChange={setTraceH} label="调整调用追踪高度" />
+        <Splitter axis="y" value={traceH} min={120} max={600} dir={-1} onChange={setTraceH} label={t("Resize the call trace", "调整调用追踪高度")} />
         <div className="wb-trace" style={{ height: traceH }}>
           <TracePanel />
         </div>
@@ -132,24 +136,17 @@ function DesktopLayout({ tcp, wide, defId }: { tcp: boolean; wide: boolean; defI
   );
 }
 
-const panes: [MobilePane, string][] = [
-  ["steps", "步骤"],
-  ["inspect", "报文"],
-  ["code", "源码"],
-  ["trace", "调用"],
-];
-
 function UnknownScenario({ name }: { name: string }) {
-  const index = useLoad("captures", load.captures);
-  const title = (id: string) => (index.state === "ready" ? index.data.find((c) => c.id === id)?.title : undefined) ?? id;
+  const t = useTx();
+  const defs = scenariosFor(useLang());
   return (
     <div className="empty wb-error">
-      <strong>没有名为 {name} 的场景</strong>
-      录下来的连接有：
+      <strong>{t("No scenario named", "没有名为")} {name}</strong>
+      {t("Recorded connections:", "录下来的连接有：")}
       <ul>
-        {scenarioDefs.map((d) => (
+        {defs.map((d) => (
           <li key={d.id}>
-            <a href={href({ page: "play", scenario: d.id, step: 0 })}>{title(d.id)}</a>
+            <a href={href({ page: "play", scenario: d.id, step: 0 })}>{d.title}</a>
           </li>
         ))}
       </ul>
@@ -159,6 +156,7 @@ function UnknownScenario({ name }: { name: string }) {
 
 /** The step list as a drawer when the rail is folded: focus moves in, Escape closes, focus goes back. */
 function StepDrawer({ def, onClose }: { def: ScenarioDef; onClose: () => void }) {
+  const t = useTx();
   const panel = useRef<HTMLElement>(null);
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
@@ -174,7 +172,7 @@ function StepDrawer({ def, onClose }: { def: ScenarioDef; onClose: () => void })
         className="drawer"
         role="dialog"
         aria-modal="true"
-        aria-label="步骤列表"
+        aria-label={t("Steps", "步骤列表")}
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => {
@@ -191,8 +189,15 @@ function StepDrawer({ def, onClose }: { def: ScenarioDef; onClose: () => void })
 }
 
 function MobileLayout({ tcp }: { tcp: boolean }) {
+  const t = useTx();
   const pane = useWB((s) => s.pane);
-  const def = scenarioById.get(useWB.getState().scenario ?? defaultScenario)!;
+  const def = scenarioFor(useLang(), useWB((s) => s.scenario) ?? defaultScenario)!;
+  const panes: [MobilePane, string][] = [
+    ["steps", t("Steps", "步骤")],
+    ["inspect", t("Packet", "报文")],
+    ["code", t("Code", "源码")],
+    ["trace", t("Calls", "调用")],
+  ];
   return (
     <div className="wb-mobile">
       <div className="wb-stage">
@@ -204,7 +209,7 @@ function MobileLayout({ tcp }: { tcp: boolean }) {
         {pane === "code" && <CodePanel />}
         {pane === "trace" && <TracePanel />}
       </div>
-      <nav className="tabbar" aria-label="面板">
+      <nav className="tabbar" aria-label={t("Panels", "面板")}>
         {panes.map(([id, label]) => (
           <button key={id} aria-current={pane === id ? "page" : undefined} onClick={() => useWB.getState().setPane(id)}>
             {label}

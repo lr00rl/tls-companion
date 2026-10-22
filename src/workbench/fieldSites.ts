@@ -36,12 +36,12 @@ export function useFieldSites(goKey: string | undefined, symbols: SymbolIndex | 
         file,
         line,
         range: enc && enc.f === file ? [enc.l, enc.e ?? enc.l] : undefined,
-        reason: `${enc ? symDisplay(enc) : fn} 第 ${line} 行使用 ${symDisplay(sym)}`,
+        reason: [`${enc ? symDisplay(enc) : fn} uses ${symDisplay(sym)} at line ${line}`, `${enc ? symDisplay(enc) : fn} 第 ${line} 行使用 ${symDisplay(sym)}`],
       },
     };
   };
   const out: FieldSites = {
-    def: { fn: sym.k, line: sym.l, target: { file: sym.f, line: sym.l, reason: `定义：${symDisplay(sym)}` } },
+    def: { fn: sym.k, line: sym.l, target: { file: sym.f, line: sym.l, reason: [`Definition: ${symDisplay(sym)}`, `定义：${symDisplay(sym)}`] } },
     writes: [],
     reads: [],
   };

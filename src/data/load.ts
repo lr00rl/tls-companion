@@ -28,7 +28,7 @@ function fetchJSON<T>(path: string): Promise<T> {
     p = fetch(base + path).then(async (r) => {
       // GitHub Pages answers a missing file with 404; the Vite dev server
       // answers it with index.html.
-      if (r.status === 404 || (r.ok && !r.headers.get("content-type")?.includes("json"))) throw new NotFoundError(`${path} 不存在`);
+      if (r.status === 404 || (r.ok && !r.headers.get("content-type")?.includes("json"))) throw new NotFoundError(`${path} was not found`);
       if (!r.ok) throw new Error(`${path}: HTTP ${r.status}`);
       const v = (await r.json()) as T;
       settled.set(path, v);
@@ -76,8 +76,8 @@ export const load = {
   refs: (pkg: string) => fetchJSON<RefsFile>(paths.refs(pkg)),
   captures: () => fetchJSON<CaptureIndexEntry[]>(paths.captures),
   capture: (id: string) => fetchJSON<Capture>(paths.capture(id)),
-  notes: () => fetchJSON<NoteIndexEntry[]>(paths.notes),
-  note: (id: string) => fetchJSON<Note>(paths.note(id)),
+  notes: (lang: "en" | "zh" = "en") => fetchJSON<NoteIndexEntry[]>(lang === "zh" ? "notes/zh/index.json" : paths.notes),
+  note: (id: string, lang: "en" | "zh" = "en") => fetchJSON<Note>(lang === "zh" ? `notes/zh/${id}.json` : paths.note(id)),
   rfcs: () => fetchJSON<RfcIndexEntry[]>(paths.rfcs),
   rfc: (n: number) => fetchJSON<RfcDoc>(paths.rfc(n)),
 };
