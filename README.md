@@ -20,7 +20,7 @@ The **RFC reader** (`#/rfc`) has 40 RFCs as unpaginated text with cross-links, a
 
 Everything works from the keyboard. `/` or Cmd-K searches steps, Go symbols, files, notes, and RFC sections, and treats `key_share`, `keyShare`, and "key share" as the same query. In the workbench, Left and Right change step, Space plays, and the timeline takes the arrow keys, Shift with an arrow for larger jumps, Home, and End. The field tree and the call trace are each one tab stop that the arrow keys move through. Tabbing into the code puts a cursor on the current line: Up and Down move it, Left and Right pick an identifier, and Enter follows it. Every view is a link, and workbench links count steps from 1, so `#/play/tls13-full/8` opens step 8.
 
-The site is in English by default, and the 中 button in the top bar switches every page to Chinese; the choice is remembered in the browser. Links carry no language, so a shared link opens in the reader's own choice, and switching on a note keeps the reader in the same section.
+The site is in English by default, and the language button in the top bar switches every page to Chinese; the choice is remembered in the browser. Links carry no language, so a shared link opens in the reader's own choice, and switching on a note keeps the reader in the same section.
 
 ## How the data is made
 
@@ -32,6 +32,8 @@ The data pipeline is semantically reproducible under the pinned toolchain, not b
 - `tools/cmd/tlsinstrument` writes a `go build -overlay` that inserts a trace call after the opening brace of every function in `crypto/tls` and the FIPS 140 `tls13`/`tls12` packages (on the same line, so upstream line numbers hold), and wraps HKDF-Extract, Derive-Secret, HKDF-Expand-Label, and the TLS 1.2 PRF so every derived secret is reported.
 - `tools/cmd/tlscapture` builds against that overlay and runs the scenarios over an in-memory pipe whose mutex is passed between the endpoints like a baton, so the trace interleaves in causal order. It decrypts every record from the key log with its own HKDF and PRF code and fails if those keys differ from the ones `crypto/tls` derived.
 - `scripts/build-notes.mjs` renders the Obsidian notes (wikilinks, mermaid, heading anchors, RFC links); `scripts/build-rfc.mjs` unpaginates the RFC text in `content/rfc`.
+
+`pnpm build` also runs `scripts/build-seo.mjs`. It keeps the interactive hash-routed application at `/tls-companion/`, and emits crawlable English and Chinese reading pages under `/tls-companion/learn/en/` and `/tls-companion/learn/zh/`, together with canonical and `hreflang` metadata, JSON-LD, `sitemap.xml`, and `robots.txt`. These files are generated into `dist/`; do not edit them by hand.
 
 Steps in `src/scenarios/` and entries in `src/history/entries.ts` anchor on function names and code text, never on line numbers. `pnpm test` resolves every anchor, symbol, note heading, and RFC section against the generated data, so a Go upgrade that renames a function fails the build and names the step to fix.
 

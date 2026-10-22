@@ -20,6 +20,35 @@ spans all of them. Every view is a hash route, so refresh, share, and the
 browser's back button all work. Code navigation pushes history entries, step
 changes replace the current one.
 
+Search crawlers cannot reliably treat those fragments as separate documents.
+The production build therefore adds a static reading edition under
+`/learn/en/` and `/learn/zh/`. It is a discovery and long-form reading surface,
+not a sixth application area: every article links back to the corresponding
+interactive note, while canonical URLs, `hreflang`, and the sitemap point at
+the static documents.
+
+The reading edition uses this hierarchy:
+
+```text
+brand                                      language
+
+note id
+article title
+one-paragraph description
+[open in workbench] [all notes]
+tags
+
+article prose (65ch maximum)
+code, tables, and diagram source
+
+previous note                         next note
+```
+
+On phones the language hub, note index, and previous/next navigation collapse
+to one column. Code and wide tables scroll inside their own bounds. There is no
+client state, loading state, or animation on this surface; the HTML response is
+the complete document and remains usable without JavaScript.
+
 One selection model drives the workbench. Choosing a step moves the playhead to
 its first event, selects its message, and opens its code. Choosing a field opens
 the line that marshals it. Choosing a call in the trace moves the playhead and
@@ -75,3 +104,11 @@ duration, always from the value on screen, so stepping or scrubbing mid-flight
 retargets instead of jumping. Dragging the scrubber or a splitter tracks the
 pointer 1:1 with pointer capture. With `prefers-reduced-motion`, the clock jumps
 and packets appear in place.
+
+The static reading edition reuses the same paper, panel, line, ink, muted,
+accent, handshake, and application roles. English headings use the system serif
+stack; Chinese headings add Noto Serif SC and native CJK serif fallbacks. The
+system sans stack carries prose, and the mono stack is reserved for IDs, tags,
+and protocol evidence. Its signature
+element is the same three-bar mark and protection-epoch color pair; no second
+visual identity or decorative motion is introduced for SEO pages.
