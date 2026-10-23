@@ -11,6 +11,8 @@ const siteUrl = origin + basePath;
 const socialImage = siteUrl + "og-card.png";
 const repositoryUrl = "https://github.com/lr00rl/tls-companion";
 
+const notesLicenseUrl = "https://creativecommons.org/licenses/by-nc-sa/4.0/";
+
 const languages = [
   {
     key: "en",
@@ -28,6 +30,7 @@ const languages = [
     next: "Next",
     diagramSource: "Mermaid diagram source",
     skipContent: "Skip to content",
+    notesLicense: "Notes licensed CC BY-NC-SA 4.0",
   },
   {
     key: "zh",
@@ -45,6 +48,7 @@ const languages = [
     next: "下一篇",
     diagramSource: "Mermaid 图表源码",
     skipContent: "跳到主要内容",
+    notesLicense: "笔记采用 CC BY-NC-SA 4.0 许可",
   },
 ];
 
@@ -54,6 +58,10 @@ function readJSON(path) {
 
 function escapeHTML(value) {
   return String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+}
+
+function footerHTML(language) {
+  return `<footer><a href="${repositoryUrl}">Source on GitHub</a> · <a href="${notesLicenseUrl}" rel="license">${escapeHTML(language.notesLicense)}</a></footer>`;
 }
 
 function escapeXML(value) {
@@ -221,7 +229,7 @@ function articlePage(language, note, index, position) {
         <nav class="note-nav" aria-label="Adjacent notes">${navLink(previous, language.previous)}${navLink(next, language.next)}</nav>
       </article>
     </main>
-    <footer><a href="${repositoryUrl}">Source on GitHub</a></footer>
+    ${footerHTML(language)}
   </body>
 </html>`;
 }
@@ -250,7 +258,7 @@ function collectionPage(language, index, documents) {
     <a class="skip-link" href="#content">${language.skipContent}</a>
     <header class="site-head"><a class="brand" href="${basePath}" translate="no"><span class="mark"><i></i><i></i><i></i></span>TLS Companion</a><nav aria-label="Language"><a href="${collectionUrl(otherLanguage)}" hreflang="${otherLanguage.code}">${otherLanguage.label}</a></nav></header>
     <main id="content" class="collection" tabindex="-1"><p class="eyebrow">${escapeHTML(language.label)}</p><h1>${escapeHTML(language.collectionTitle)}</h1><p class="lede">${escapeHTML(language.collectionDescription)}</p><p class="actions"><a class="primary" href="${basePath}">${escapeHTML(language.openWorkbench)}</a></p><ol>${cards}</ol></main>
-    <footer><a href="${repositoryUrl}">Source on GitHub</a></footer>
+    ${footerHTML(language)}
   </body>
 </html>`;
 }
@@ -260,7 +268,7 @@ function hubPage() {
   const language = languages[0];
   const structuredData = { "@context": "https://schema.org", "@type": "CollectionPage", name: "TLS Companion Notes", url: canonical, inLanguage: ["en", "zh-Hans"] };
   return `${head({ title: "TLS Companion Notes", description: "Bilingual notes about TLS, HTTPS, PKI, QUIC, ECH, and post-quantum cryptography.", canonical, language, structuredData })}
-  <body><a class="skip-link" href="#content">${language.skipContent}</a><header class="site-head"><a class="brand" href="${basePath}" translate="no"><span class="mark"><i></i><i></i><i></i></span>TLS Companion</a></header><main id="content" class="language-hub" tabindex="-1"><p class="eyebrow">Static reading edition</p><h1>TLS Companion Notes</h1><p class="lede">Choose a language. The interactive workbench remains available from every article.</p><div class="language-choices"><a href="${collectionUrl(languages[0])}"><strong>English</strong><span>${escapeHTML(languages[0].collectionDescription)}</span></a><a href="${collectionUrl(languages[1])}"><strong>简体中文</strong><span>${escapeHTML(languages[1].collectionDescription)}</span></a></div></main><footer><a href="${repositoryUrl}">Source on GitHub</a></footer></body></html>`;
+  <body><a class="skip-link" href="#content">${language.skipContent}</a><header class="site-head"><a class="brand" href="${basePath}" translate="no"><span class="mark"><i></i><i></i><i></i></span>TLS Companion</a></header><main id="content" class="language-hub" tabindex="-1"><p class="eyebrow">Static reading edition</p><h1>TLS Companion Notes</h1><p class="lede">Choose a language. The interactive workbench remains available from every article.</p><div class="language-choices"><a href="${collectionUrl(languages[0])}"><strong>English</strong><span>${escapeHTML(languages[0].collectionDescription)}</span></a><a href="${collectionUrl(languages[1])}"><strong>简体中文</strong><span>${escapeHTML(languages[1].collectionDescription)}</span></a></div></main>${footerHTML(languages[0])}</body></html>`;
 }
 
 const css = readFileSync(join(root, "scripts/seo.css"), "utf8");
