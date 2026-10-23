@@ -73,6 +73,12 @@ src/i18n/         language state, Chinese scenario and history text
 docs/DESIGN.md    design decisions and tokens
 ```
 
+## License
+
+The code is licensed under the Mozilla Public License 2.0, in [LICENSE](LICENSE). That covers `src/`, `tools/`, `scripts/`, and the build configuration. You can use it in other projects, closed-source ones included, but a file from this repository that you change and distribute stays under MPL-2.0, and its source has to be available.
+
+The notes in `content/notes` and `content/notes-en` are licensed under CC BY-NC-SA 4.0, as [content/LICENSE.md](content/LICENSE.md) explains: you may share and adapt them with credit, under the same license, for non-commercial use.
+
 ## Third-party content
 
-Go source code shown by the site is from the Go project and is distributed under the BSD-style license in the Go repository. RFC text is copyright of the IETF Trust and the authors, reproduced under the IETF Trust's legal provisions. The notes are the author's own writing.
+Go source code shown by the site is from the Go project and is distributed under the BSD-style license in the Go repository. RFC text is copyright of the IETF Trust and the authors, reproduced under the IETF Trust's legal provisions. Neither is covered by the licenses above.
